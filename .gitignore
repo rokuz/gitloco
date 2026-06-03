@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# OS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+
+# GitLoco runtime data (when GitLoco is used on this repo itself)
+.gitloco/
+
+# Build artifacts
+backend/src/gitloco/static/
