@@ -22,5 +22,8 @@ dist/
 # GitLoco runtime data (when GitLoco is used on this repo itself)
 .gitloco/
 
+# Claude Code per-user settings
+.claude/settings.local.json
+
 # Build artifacts
 backend/src/gitloco/static/
