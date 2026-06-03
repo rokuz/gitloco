@@ -1,0 +1,98 @@
+@import "react-diff-view/style/index.css";
+
+/* Dark theme overrides for react-diff-view */
+.diff {
+  background: #0b0d12;
+  color: #e6e8eb;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.diff td {
+  vertical-align: top;
+}
+
+/* Line numbers / gutters */
+.diff-gutter-col {
+  width: 3rem;
+}
+.diff-gutter {
+  background: #0e1117;
+  color: #6b7280;
+  border-right: 1px solid #1f2937;
+  padding: 0 0.4rem;
+  text-align: right;
+  user-select: none;
+}
+.diff-gutter-insert { background: #052e1c; color: #6ee7b7; }
+.diff-gutter-delete { background: #3f0f1a; color: #fca5a5; }
+
+.diff-code,
+.diff-code-edit {
+  padding: 0 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.diff-code-insert  { background: rgba(16, 185, 129, 0.10); }
+.diff-code-delete  { background: rgba(244, 63, 94,   0.10); }
+.diff-code-insert .diff-code-edit { background: rgba(16, 185, 129, 0.25); }
+.diff-code-delete .diff-code-edit { background: rgba(244, 63, 94,   0.25); }
+
+.diff-decoration,
+.diff-hunk-header {
+  background: #11151b;
+  color: #94a3b8;
+  border-top: 1px solid #1f2937;
+  border-bottom: 1px solid #1f2937;
+  padding: 0.25rem 0.6rem;
+  font-size: 11px;
+}
+.diff-hunk-header-content {
+  font-family: ui-monospace, monospace;
+}
+
+.diff-line:hover .diff-gutter:not(.diff-gutter-insert):not(.diff-gutter-delete) {
+  background: #1f2937;
+  cursor: pointer;
+}
+
+/* Prism/refractor token colors — dark theme */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata { color: #6a737d; font-style: italic; }
+.token.punctuation { color: #c9d1d9; }
+.token.namespace { opacity: 0.7; }
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted { color: #f0883e; }
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted { color: #a5d6ff; }
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string { color: #ff7b72; }
+.token.atrule,
+.token.attr-value,
+.token.keyword { color: #ff7b72; }
+.token.function,
+.token.class-name { color: #d2a8ff; }
+.token.regex,
+.token.important,
+.token.variable { color: #ffa657; }
+.token.important,
+.token.bold { font-weight: bold; }
+.token.italic { font-style: italic; }
+.token.entity { cursor: help; }
