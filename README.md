@@ -74,9 +74,12 @@ Every human action (new thread or human reply) captures the full file set as a n
 
 ### Mobile
 
-The sidebar becomes a slide-over drawer below the `md` breakpoint, so the same UI works from a phone over LAN.
+The sidebar becomes a slide-over drawer below the `md` breakpoint, so the same UI works from a phone over LAN. Threads embed inline on the diff there too — you can carry on a review conversation from your phone.
 
-![Mobile drawer](docs/img/05-mobile-drawer.png)
+<p>
+  <img src="docs/img/05-mobile-drawer.png" alt="Mobile drawer" width="320" />
+  <img src="docs/img/06-mobile-thread.png" alt="Mobile inline thread" width="320" />
+</p>
 
 ## Stack
 
