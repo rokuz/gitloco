@@ -12,7 +12,7 @@ I, like many others, work with AI to write code. And when the machine writes mos
 
 The problem is the channel. I kept struggling to explain, in an AI agent's command line, how I want a piece of code to look and work — describing a line in prose is clumsy when I could just *point at it*. So I wanted a local tool that sits between me and the AI agent, with comment threads where I can say exactly what to do with any single line of generated code. The agent reads those comments, fixes the lines, and replies.
 
-This is how GitLoco appeared. "Loco" comes from **local** — it runs entirely on your machine, just you and the agent. But I like the play on words too: *loco*motive. As Sheldon Cooper said, everyone loves trains. 🚂
+This is how GitLoco appeared. "Loco" comes from **local** — it runs entirely on your machine, just you and the agent. But I like the play of words too: *loco*motive. As Sheldon Cooper said, everyone loves trains. 🚂
 
 ## What it does
 
