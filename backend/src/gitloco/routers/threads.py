@@ -103,6 +103,21 @@ def list_orphan_threads(request: Request) -> list[ThreadOut]:
         return [_thread_out(t) for t in orphaned_threads(session, repo)]
 
 
+@router.get("/open-counts", response_model=dict[str, int])
+def open_thread_counts(request: Request) -> dict[str, int]:
+    """Number of open threads per commit SHA, keyed by `commit_sha` (after
+    reconciliation). Used to badge commits in the UI's left panel."""
+    engine = request.app.state.engine
+    repo = request.app.state.repo
+    with Session(engine) as session:
+        reconcile_threads(session, repo)
+        rows = session.exec(select(Thread).where(Thread.status == "open")).all()
+        counts: dict[str, int] = {}
+        for t in rows:
+            counts[t.commit_sha] = counts.get(t.commit_sha, 0) + 1
+        return counts
+
+
 @router.post("", response_model=ThreadOut, status_code=201)
 def create_thread(
     payload: NewThreadIn,

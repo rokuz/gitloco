@@ -13,6 +13,11 @@ export function CommitList({ selectedSha, onSelect }: Props) {
     queryFn: api.commits,
     refetchInterval: 5000,
   });
+  const { data: openCounts } = useQuery({
+    queryKey: ["threads", "open-counts"],
+    queryFn: api.openThreadCounts,
+    refetchInterval: 5000,
+  });
 
   if (isLoading) return <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">Loading commits…</div>;
   if (error) return <div className="p-4 text-sm text-red-600 dark:text-red-400">Error: {String(error)}</div>;
@@ -27,6 +32,7 @@ export function CommitList({ selectedSha, onSelect }: Props) {
           key={c.sha}
           commit={c}
           selected={c.sha === selectedSha}
+          openCount={openCounts?.[c.sha] ?? 0}
           onClick={() => onSelect(c.sha)}
         />
       ))}
@@ -37,10 +43,12 @@ export function CommitList({ selectedSha, onSelect }: Props) {
 function CommitRow({
   commit,
   selected,
+  openCount,
   onClick,
 }: {
   commit: Commit;
   selected: boolean;
+  openCount: number;
   onClick: () => void;
 }) {
   return (
@@ -71,6 +79,17 @@ function CommitRow({
           <span className="truncate text-sm text-zinc-900 dark:text-zinc-100">
             {commit.subject}
           </span>
+          {openCount > 0 && (
+            <span
+              title={`${openCount} unresolved thread${openCount > 1 ? "s" : ""}`}
+              className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 px-1.5 py-0.5 text-[10px] font-medium"
+            >
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6l-3 3v-3H3a1 1 0 0 1-1-1V3z" />
+              </svg>
+              {openCount}
+            </span>
+          )}
         </div>
         <div className="ml-4 pl-2 text-xs text-zinc-500 truncate">
           {commit.is_working_tree
