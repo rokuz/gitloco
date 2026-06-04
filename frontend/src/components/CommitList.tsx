@@ -14,14 +14,14 @@ export function CommitList({ selectedSha, onSelect }: Props) {
     refetchInterval: 5000,
   });
 
-  if (isLoading) return <div className="p-4 text-sm text-zinc-400">Loading commits…</div>;
-  if (error) return <div className="p-4 text-sm text-red-400">Error: {String(error)}</div>;
+  if (isLoading) return <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">Loading commits…</div>;
+  if (error) return <div className="p-4 text-sm text-red-600 dark:text-red-400">Error: {String(error)}</div>;
   if (!data || data.commits.length === 0) {
-    return <div className="p-4 text-sm text-zinc-400">No commits yet.</div>;
+    return <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">No commits yet.</div>;
   }
 
   return (
-    <ul className="divide-y divide-zinc-800">
+    <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
       {data.commits.map((c) => (
         <CommitRow
           key={c.sha}
@@ -50,21 +50,27 @@ function CommitRow({
         onClick={onClick}
         className={[
           "w-full text-left px-3 py-3 md:py-2 transition-colors",
-          selected ? "bg-zinc-800" : "hover:bg-zinc-900 active:bg-zinc-800",
+          selected
+            ? "bg-zinc-200 dark:bg-zinc-800"
+            : "hover:bg-zinc-100 active:bg-zinc-200 dark:hover:bg-zinc-900 dark:active:bg-zinc-800",
         ].join(" ")}
       >
         <div className="flex items-center gap-2">
           <span
             className={[
               "inline-block h-2 w-2 rounded-full shrink-0",
-              commit.is_working_tree ? "bg-amber-400" : "bg-zinc-500",
+              commit.is_working_tree
+                ? "bg-amber-500 dark:bg-amber-400"
+                : "bg-zinc-400 dark:bg-zinc-500",
             ].join(" ")}
             aria-hidden
           />
-          <span className="font-mono text-xs text-zinc-400 shrink-0">
+          <span className="font-mono text-xs text-zinc-600 dark:text-zinc-400 shrink-0">
             {commit.short_sha}
           </span>
-          <span className="truncate text-sm text-zinc-100">{commit.subject}</span>
+          <span className="truncate text-sm text-zinc-900 dark:text-zinc-100">
+            {commit.subject}
+          </span>
         </div>
         <div className="ml-4 pl-2 text-xs text-zinc-500 truncate">
           {commit.is_working_tree

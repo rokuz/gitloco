@@ -1,9 +1,72 @@
 @import "react-diff-view/style/index.css";
 
-/* Dark theme overrides for react-diff-view */
+/* Light theme defaults */
+:root {
+  --diff-bg: #ffffff;
+  --diff-text: #1f2328;
+  --diff-gutter-bg: #f6f8fa;
+  --diff-gutter-text: #6e7781;
+  --diff-gutter-border: #d0d7de;
+  --diff-insert-bg: rgba(46, 160, 67, 0.12);
+  --diff-insert-gutter-bg: rgba(46, 160, 67, 0.2);
+  --diff-insert-gutter-text: #1a7f37;
+  --diff-delete-bg: rgba(207, 34, 46, 0.12);
+  --diff-delete-gutter-bg: rgba(207, 34, 46, 0.2);
+  --diff-delete-gutter-text: #cf222e;
+  --diff-edit-bg: rgba(46, 160, 67, 0.28);
+  --diff-edit-delete-bg: rgba(207, 34, 46, 0.28);
+  --diff-hunk-header-bg: #f6f8fa;
+  --diff-hunk-header-text: #57606a;
+  --diff-hunk-header-border: #d0d7de;
+  --diff-gutter-hover-bg: #eaeef2;
+
+  --tok-comment: #6e7781;
+  --tok-punctuation: #57606a;
+  --tok-property: #953800;
+  --tok-string: #0a3069;
+  --tok-string-alt: #0a3069;
+  --tok-keyword: #cf222e;
+  --tok-function: #8250df;
+  --tok-class: #953800;
+  --tok-interp: #953800;
+  --tok-operator: #cf222e;
+}
+
+/* Dark theme overrides */
+html.dark {
+  --diff-bg: #0b0d12;
+  --diff-text: #e6e8eb;
+  --diff-gutter-bg: #0e1117;
+  --diff-gutter-text: #6b7280;
+  --diff-gutter-border: #1f2937;
+  --diff-insert-bg: rgba(16, 185, 129, 0.10);
+  --diff-insert-gutter-bg: #052e1c;
+  --diff-insert-gutter-text: #6ee7b7;
+  --diff-delete-bg: rgba(244, 63, 94, 0.10);
+  --diff-delete-gutter-bg: #3f0f1a;
+  --diff-delete-gutter-text: #fca5a5;
+  --diff-edit-bg: rgba(16, 185, 129, 0.25);
+  --diff-edit-delete-bg: rgba(244, 63, 94, 0.25);
+  --diff-hunk-header-bg: #11151b;
+  --diff-hunk-header-text: #94a3b8;
+  --diff-hunk-header-border: #1f2937;
+  --diff-gutter-hover-bg: #1f2937;
+
+  --tok-comment: #8b949e;
+  --tok-punctuation: #c9d1d9;
+  --tok-property: #ffa657;
+  --tok-string: #a5d6ff;
+  --tok-string-alt: #a5d6ff;
+  --tok-keyword: #ff7b72;
+  --tok-function: #d2a8ff;
+  --tok-class: #ffa657;
+  --tok-interp: #ffa657;
+  --tok-operator: #ff7b72;
+}
+
 .diff {
-  background: #0b0d12;
-  color: #e6e8eb;
+  background: var(--diff-bg);
+  color: var(--diff-text);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 12.5px;
   line-height: 1.55;
@@ -15,38 +78,44 @@
   vertical-align: top;
 }
 
-/* Line numbers / gutters */
 .diff-gutter-col {
   width: 3rem;
 }
 .diff-gutter {
-  background: #0e1117;
-  color: #6b7280;
-  border-right: 1px solid #1f2937;
+  background: var(--diff-gutter-bg);
+  color: var(--diff-gutter-text);
+  border-right: 1px solid var(--diff-gutter-border);
   padding: 0 0.4rem;
   text-align: right;
   user-select: none;
 }
-.diff-gutter-insert { background: #052e1c; color: #6ee7b7; }
-.diff-gutter-delete { background: #3f0f1a; color: #fca5a5; }
+.diff-gutter-insert {
+  background: var(--diff-insert-gutter-bg);
+  color: var(--diff-insert-gutter-text);
+}
+.diff-gutter-delete {
+  background: var(--diff-delete-gutter-bg);
+  color: var(--diff-delete-gutter-text);
+}
 
 .diff-code,
 .diff-code-edit {
   padding: 0 0.5rem;
   white-space: pre-wrap;
   word-break: break-word;
+  color: var(--diff-text);
 }
-.diff-code-insert  { background: rgba(16, 185, 129, 0.10); }
-.diff-code-delete  { background: rgba(244, 63, 94,   0.10); }
-.diff-code-insert .diff-code-edit { background: rgba(16, 185, 129, 0.25); }
-.diff-code-delete .diff-code-edit { background: rgba(244, 63, 94,   0.25); }
+.diff-code-insert  { background: var(--diff-insert-bg); }
+.diff-code-delete  { background: var(--diff-delete-bg); }
+.diff-code-insert .diff-code-edit { background: var(--diff-edit-bg); }
+.diff-code-delete .diff-code-edit { background: var(--diff-edit-delete-bg); }
 
 .diff-decoration,
 .diff-hunk-header {
-  background: #11151b;
-  color: #94a3b8;
-  border-top: 1px solid #1f2937;
-  border-bottom: 1px solid #1f2937;
+  background: var(--diff-hunk-header-bg);
+  color: var(--diff-hunk-header-text);
+  border-top: 1px solid var(--diff-hunk-header-border);
+  border-bottom: 1px solid var(--diff-hunk-header-border);
   padding: 0.25rem 0.6rem;
   font-size: 11px;
 }
@@ -55,22 +124,17 @@
 }
 
 .diff-line:hover .diff-gutter:not(.diff-gutter-insert):not(.diff-gutter-delete) {
-  background: #1f2937;
+  background: var(--diff-gutter-hover-bg);
   cursor: pointer;
 }
 
-/* Prism/refractor token colors — dark theme, high contrast.
-   Make the cell itself a default-color container so token spans win. */
-.diff-code,
-.diff-code-insert,
-.diff-code-delete { color: #e6e8eb; }
-
+/* Prism / refractor token colors via CSS variables */
 .token.comment,
 .token.prolog,
 .token.doctype,
-.token.cdata { color: #8b949e; font-style: italic; }
+.token.cdata { color: var(--tok-comment); font-style: italic; }
 .token.punctuation,
-.token.double-colon { color: #c9d1d9; }
+.token.double-colon { color: var(--tok-punctuation); }
 .token.namespace { opacity: 0.85; }
 .token.property,
 .token.tag,
@@ -78,7 +142,7 @@
 .token.number,
 .token.constant,
 .token.symbol,
-.token.deleted { color: #ffa657; }
+.token.deleted { color: var(--tok-property); }
 .token.selector,
 .token.attr-name,
 .token.string,
@@ -86,27 +150,27 @@
 .token.builtin,
 .token.triple-quoted-string,
 .token.string-interpolation,
-.token.inserted { color: #a5d6ff; }
-.token.interpolation { color: #ffa657; }
-.token.interpolation-punctuation { color: #ff7b72; }
+.token.inserted { color: var(--tok-string); }
+.token.interpolation { color: var(--tok-interp); }
+.token.interpolation-punctuation { color: var(--tok-keyword); }
 .token.operator,
 .token.entity,
 .token.url,
 .language-css .token.string,
-.style .token.string { color: #ff7b72; }
+.style .token.string { color: var(--tok-operator); }
 .token.atrule,
 .token.attr-value,
 .token.keyword,
 .token.macro,
 .token.directive,
-.token.directive-hash { color: #ff7b72; font-weight: 600; }
+.token.directive-hash { color: var(--tok-keyword); font-weight: 600; }
 .token.function,
-.token.function-variable { color: #d2a8ff; }
+.token.function-variable { color: var(--tok-function); }
 .token.class-name,
-.token.generic.class-name { color: #ffa657; }
+.token.generic.class-name { color: var(--tok-class); }
 .token.regex,
 .token.important,
-.token.variable { color: #ffa657; }
+.token.variable { color: var(--tok-class); }
 .token.important,
 .token.bold { font-weight: bold; }
 .token.italic { font-style: italic; }

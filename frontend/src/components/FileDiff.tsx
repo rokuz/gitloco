@@ -52,11 +52,11 @@ const STATUS_LABEL: Record<FileDiffData["status"], string> = {
 };
 
 const STATUS_COLOR: Record<FileDiffData["status"], string> = {
-  added: "bg-emerald-900/40 text-emerald-300",
-  deleted: "bg-rose-900/40 text-rose-300",
-  modified: "bg-amber-900/40 text-amber-300",
-  renamed: "bg-sky-900/40 text-sky-300",
-  copied: "bg-sky-900/40 text-sky-300",
+  added:    "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+  deleted:  "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
+  modified: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  renamed:  "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
+  copied:   "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
 };
 
 function findChangeKey(
@@ -101,9 +101,11 @@ export function FileDiff({
 
   if (file.is_binary) {
     return (
-      <section className="rounded border border-zinc-800 overflow-hidden">
+      <section className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         <FileHeader file={file} displayPath={displayPath} />
-        <div className="bg-zinc-950 px-4 py-3 text-sm text-zinc-400">Binary file</div>
+        <div className="bg-white dark:bg-zinc-950 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+          Binary file
+        </div>
       </section>
     );
   }
@@ -111,9 +113,11 @@ export function FileDiff({
   const parsed = parseDiff(file.patch_text);
   if (parsed.length === 0) {
     return (
-      <section className="rounded border border-zinc-800 overflow-hidden">
+      <section className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         <FileHeader file={file} displayPath={displayPath} />
-        <div className="bg-zinc-950 px-4 py-3 text-sm text-zinc-400">No textual changes.</div>
+        <div className="bg-white dark:bg-zinc-950 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+          No textual changes.
+        </div>
       </section>
     );
   }
@@ -122,7 +126,7 @@ export function FileDiff({
   const filePath = file.new_path ?? file.old_path ?? "";
 
   return (
-    <section className="rounded border border-zinc-800 overflow-hidden">
+    <section className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden">
       <FileHeader file={file} displayPath={displayPath} />
       {parsed.map((parsedFile, fIdx) => (
         <ParsedFileBody
@@ -246,7 +250,7 @@ function FileHeader({
   const renamed =
     file.status === "renamed" && file.old_path && file.old_path !== file.new_path;
   return (
-    <header className="flex items-center gap-2 bg-zinc-900 px-3 py-2 border-b border-zinc-800">
+    <header className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
       <span
         className={[
           "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
@@ -255,7 +259,7 @@ function FileHeader({
       >
         {STATUS_LABEL[file.status]}
       </span>
-      <code className="font-mono text-xs text-zinc-200 truncate">
+      <code className="font-mono text-xs text-zinc-800 dark:text-zinc-200 truncate">
         {renamed ? `${file.old_path} → ${displayPath}` : displayPath}
       </code>
     </header>

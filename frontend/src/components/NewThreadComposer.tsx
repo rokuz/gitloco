@@ -44,7 +44,7 @@ export function NewThreadComposer({
   });
 
   return (
-    <div className="my-2 rounded border border-zinc-700 bg-zinc-900 p-2 space-y-2">
+    <div className="my-2 rounded border border-zinc-300 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 p-2 space-y-2">
       <div className="text-[11px] text-zinc-500">
         New thread on {filePath}:{lineNumber} ({lineSide})
       </div>
@@ -54,16 +54,16 @@ export function NewThreadComposer({
         onChange={(e) => setBody(e.target.value)}
         placeholder="What do you think about this line?"
         rows={3}
-        className="w-full resize-y rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+        className="w-full resize-y rounded border border-zinc-300 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 px-2 py-1 text-sm focus:outline-none focus:border-zinc-500 dark:focus:border-zinc-500"
       />
       {mutation.error && (
-        <div className="text-xs text-red-400">{String(mutation.error)}</div>
+        <div className="text-xs text-red-600 dark:text-red-400">{String(mutation.error)}</div>
       )}
       <div className="flex justify-end gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className="px-3 py-1 text-sm text-zinc-300 hover:text-zinc-100"
+          className="px-3 py-1 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
         >
           Cancel
         </button>
@@ -73,7 +73,7 @@ export function NewThreadComposer({
             if (body.trim()) mutation.mutate();
           }}
           disabled={mutation.isPending || !body.trim()}
-          className="rounded bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 px-3 py-1 text-sm text-zinc-50"
+          className="rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-50 dark:bg-zinc-700 dark:hover:bg-zinc-600 disabled:opacity-50 px-3 py-1 text-sm"
         >
           Comment
         </button>

@@ -80,8 +80,8 @@ export function CommitDiff({ sha }: Props) {
     versionsQuery.error ??
     (hasVersions ? compareQuery.error : liveDiffQuery.error);
 
-  if (isLoading) return <div className="p-4 text-sm text-zinc-400">Loading diff…</div>;
-  if (error) return <div className="p-4 text-sm text-red-400">Error: {String(error)}</div>;
+  if (isLoading) return <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">Loading diff…</div>;
+  if (error) return <div className="p-4 text-sm text-red-600 dark:text-red-400">Error: {String(error)}</div>;
 
   const files: FileDiffData[] = hasVersions
     ? (compareQuery.data?.files ?? [])
@@ -105,7 +105,7 @@ export function CommitDiff({ sha }: Props) {
         />
       )}
       {files.length === 0 ? (
-        <div className="p-4 text-sm text-zinc-400">No changes.</div>
+        <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">No changes.</div>
       ) : (
         files.map((f) => {
           const filePath = f.new_path ?? f.old_path ?? "";
