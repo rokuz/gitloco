@@ -2,6 +2,10 @@
 
 /* Light theme defaults */
 :root {
+  /* react-diff-view drives .diff-line / .diff-decoration-content off this
+     variable; override it so code renders in JetBrains Mono. */
+  --diff-font-family: "JetBrains Mono Variable", ui-monospace, SFMono-Regular,
+    Consolas, "Liberation Mono", Menlo, monospace;
   --diff-bg: #ffffff;
   --diff-text: #1f2328;
   --diff-gutter-bg: #f6f8fa;
@@ -67,7 +71,7 @@ html.dark {
 .diff {
   background: var(--diff-bg);
   color: var(--diff-text);
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 12.5px;
   line-height: 1.55;
   border-collapse: collapse;
@@ -120,7 +124,7 @@ html.dark {
   font-size: 11px;
 }
 .diff-hunk-header-content {
-  font-family: ui-monospace, monospace;
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
 }
 
 .diff-line:hover .diff-gutter:not(.diff-gutter-insert):not(.diff-gutter-delete) {

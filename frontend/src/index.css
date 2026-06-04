@@ -1,9 +1,18 @@
 @import "tailwindcss";
+/* Self-hosted JetBrains Mono (variable) — bundled into the build so the UI
+   needs no network/CDN access on the LAN. */
+@import "@fontsource-variable/jetbrains-mono";
 @import "./styles/diff.css";
 
 /* Enable class-based dark mode for Tailwind utilities — toggled by setting
    <html class="dark">. */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Route Tailwind's `font-mono` utility through JetBrains Mono. */
+@theme {
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular,
+    "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+}
 
 html, body, #root {
   height: 100%;
