@@ -14,6 +14,15 @@
     "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
+/* Never apply programming ligatures — monospace text must read character for
+   character (`->` stays `->`). Emoji are unaffected (not liga/calt features). */
+.font-mono,
+code,
+pre {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;

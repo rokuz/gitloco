@@ -76,6 +76,10 @@ html.dark {
   line-height: 1.55;
   border-collapse: collapse;
   width: 100%;
+  /* Code must read literally — disable JetBrains Mono's ligatures so e.g.
+     `->`, `=>`, `!=`, `>=` render as the separate characters they are. */
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
 }
 
 .diff td {
@@ -154,6 +158,7 @@ html.dark {
 .token.builtin,
 .token.triple-quoted-string,
 .token.string-interpolation,
+.token.interpolation-string,
 .token.inserted { color: var(--tok-string); }
 .token.interpolation { color: var(--tok-interp); }
 .token.interpolation-punctuation { color: var(--tok-keyword); }
@@ -165,6 +170,7 @@ html.dark {
 .token.atrule,
 .token.attr-value,
 .token.keyword,
+.token.import,
 .token.macro,
 .token.directive,
 .token.directive-hash { color: var(--tok-keyword); font-weight: 600; }

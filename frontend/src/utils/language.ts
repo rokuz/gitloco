@@ -29,6 +29,9 @@ const BY_EXT: Record<string, string> = {
   "h++": "cpp",
   hh: "cpp",
   cs: "csharp",
+  m: "objectivec",
+  mm: "objectivec", // Objective-C++ — objectivec is the closest bundled grammar
+  lua: "lua",
   swift: "swift",
   php: "php",
   scala: "scala",
