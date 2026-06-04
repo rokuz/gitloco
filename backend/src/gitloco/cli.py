@@ -73,6 +73,19 @@ def _ensure_gitignore(repo_root: Path) -> None:
         gitignore.write_text(GITIGNORE_ENTRY, encoding="utf-8")
 
 
+def _set_process_title() -> None:
+    """Show up as ``gitloco`` in ps/Activity Monitor instead of ``python``.
+
+    Best-effort: setproctitle needs a native build, so never let a failure
+    here block startup."""
+    try:
+        import setproctitle
+
+        setproctitle.setproctitle("gitloco")
+    except Exception:
+        pass
+
+
 def _open_browser_when_ready(url: str, delay: float = 0.6) -> None:
     def _open() -> None:
         time.sleep(delay)
@@ -184,6 +197,7 @@ def main(
     force: bool,
 ) -> None:
     """Launch GitLoco for a local git repository."""
+    _set_process_title()
     try:
         repo = open_repo(path)
     except NotAGitRepoError as exc:
