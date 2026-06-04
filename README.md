@@ -4,7 +4,7 @@
 
 Local code-review tool for AI-generated git changes. A human leaves comments on diff lines through a browser UI; an AI agent (Claude) reads them, replies, and amends the original commits via rebase. Threads survive the rebase because GitLoco snapshots both sides of the diff at comment time.
 
-![Overview](docs/img/01-overview.png)
+![Inline comment thread — human ↔ AI back-and-forth right on the diff line](docs/img/03-inline-thread.png)
 
 ## What it does
 
@@ -60,13 +60,13 @@ The `./test.sh` script starts the backend and Vite together, against GitLoco's o
 
 ## Screenshots
 
+### Commit list + diff overview
+
+![Overview](docs/img/01-overview.png)
+
 ### Diff view with syntax highlighting
 
 ![Diff view](docs/img/02-diff-syntax-highlight.png)
-
-### Inline comment threads — human ↔ AI back-and-forth right on the line
-
-![Inline thread](docs/img/03-inline-thread.png)
 
 ### Version compare — switch and compare snapshots of a commit over time
 
