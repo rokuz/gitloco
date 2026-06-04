@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -37,7 +37,7 @@ def get_commits(request: Request) -> CommitListOut:
                 short_sha="WORKING",
                 author_name="(working tree)",
                 author_email="",
-                committed_at=datetime.now(timezone.utc),
+                committed_at=datetime.now(UTC),
                 subject="Uncommitted changes",
                 parent_shas=[],
                 is_working_tree=True,

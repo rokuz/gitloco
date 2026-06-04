@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pygit2
@@ -50,15 +50,15 @@ def _thread_dict(thread: Thread, *, engine: Engine) -> dict[str, Any]:
 
 def _commit_time(repo: pygit2.Repository, sha: str) -> datetime:
     if sha == WORKING_TREE_SHA:
-        return datetime.max.replace(tzinfo=timezone.utc)
+        return datetime.max.replace(tzinfo=UTC)
     obj = repo.get(sha)
     if obj is None:
-        return datetime.min.replace(tzinfo=timezone.utc)
+        return datetime.min.replace(tzinfo=UTC)
     if isinstance(obj, pygit2.Tag):
         obj = obj.peel(pygit2.Commit)
     if not isinstance(obj, pygit2.Commit):
-        return datetime.min.replace(tzinfo=timezone.utc)
-    return datetime.fromtimestamp(obj.commit_time, tz=timezone.utc)
+        return datetime.min.replace(tzinfo=UTC)
+    return datetime.fromtimestamp(obj.commit_time, tz=UTC)
 
 
 def _snapshot_text(session: Session, snapshot_id: int | None) -> str | None:

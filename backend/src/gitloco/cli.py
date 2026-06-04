@@ -1,3 +1,4 @@
+import json
 import socket
 import sys
 import threading
@@ -13,8 +14,6 @@ from gitloco import __version__
 from gitloco.app import create_app
 from gitloco.config import Settings
 from gitloco.repo import NotAGitRepoError, open_repo
-
-import json
 
 GITIGNORE_ENTRY = ".gitloco/\n"
 CLAUDE_COMMAND_RELPATH = Path(".claude/commands/gitloco.md")

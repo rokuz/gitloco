@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import LargeBinary
 from sqlmodel import Field, Relationship, SQLModel
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # DB-level values are plain strings; API/schema layer enforces literals.

@@ -1,5 +1,7 @@
 # GitLoco
 
+[![CI](https://github.com/rokuz/gitloco/actions/workflows/ci.yml/badge.svg)](https://github.com/rokuz/gitloco/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Local code-review tool for AI-generated git changes. A human leaves comments on diff lines through a browser UI; an AI agent (Claude) reads them, replies, and amends the original commits via rebase. Threads survive the rebase because GitLoco snapshots both sides of the diff at comment time.
 
 ![Overview](docs/img/01-overview.png)

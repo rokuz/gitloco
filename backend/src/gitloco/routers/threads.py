@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
@@ -108,7 +108,7 @@ def create_thread(
         session.add(thread)
         session.flush()
 
-        version, primary_parent, primary_commit = capture_version(
+        _version, primary_parent, primary_commit = capture_version(
             repo=repo,
             session=session,
             commit_sha=payload.commit_sha,
@@ -190,7 +190,7 @@ def resolve_thread(
         if thread.status == "resolved":
             return _thread_out(thread)
         thread.status = "resolved"
-        thread.resolved_at = datetime.now(timezone.utc)
+        thread.resolved_at = datetime.now(UTC)
         session.add(thread)
         session.commit()
         session.refresh(thread)

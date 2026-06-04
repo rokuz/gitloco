@@ -184,7 +184,7 @@ def _unified_patch(
     # this as one file.
     header_old = from_side.path or file_path
     header_new = to_side.path or file_path
-    full = "".join([f"diff --git a/{header_old} b/{header_new}\n"] + body_lines)
+    full = "".join([f"diff --git a/{header_old} b/{header_new}\n", *body_lines])
     # Ensure the patch ends with a newline.
     if not full.endswith("\n"):
         full += "\n"

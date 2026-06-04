@@ -1,6 +1,19 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from gitloco import __version__
+from gitloco.config import Settings
+from gitloco.db import make_engine
+from gitloco.mcp_server import build_mcp
+from gitloco.repo import open_repo
+from gitloco.routers import commits as commits_router
+from gitloco.routers import files as files_router
+from gitloco.routers import threads as threads_router
+
 
 def _display_path(p: Path) -> str:
     """Render a filesystem path with the user's home directory collapsed to
@@ -16,19 +29,6 @@ def _display_path(p: Path) -> str:
     if str(rel) in ("", "."):
         return "~"
     return f"~/{rel.as_posix()}"
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-
-from gitloco import __version__
-from gitloco.config import Settings
-from gitloco.db import make_engine
-from gitloco.mcp_server import build_mcp
-from gitloco.repo import open_repo
-from gitloco.routers import commits as commits_router
-from gitloco.routers import files as files_router
-from gitloco.routers import threads as threads_router
 
 
 def create_app(settings: Settings) -> FastAPI:

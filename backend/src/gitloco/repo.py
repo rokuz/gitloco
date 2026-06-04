@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pygit2
@@ -49,7 +49,7 @@ def has_working_tree_changes(repo: pygit2.Repository) -> bool:
 def _to_commit_info(commit: pygit2.Commit) -> CommitInfo:
     sha = str(commit.id)
     subject = commit.message.splitlines()[0] if commit.message else ""
-    committed_at = datetime.fromtimestamp(commit.commit_time, tz=timezone.utc)
+    committed_at = datetime.fromtimestamp(commit.commit_time, tz=UTC)
     return CommitInfo(
         sha=sha,
         short_sha=sha[:7],

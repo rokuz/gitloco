@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pygit2
 
@@ -89,7 +89,7 @@ def iter_commits_touching(
                         author_name=commit.author.name,
                         author_email=commit.author.email,
                         committed_at=datetime.fromtimestamp(
-                            commit.commit_time, tz=timezone.utc
+                            commit.commit_time, tz=UTC
                         ),
                         subject=commit.message.splitlines()[0] if commit.message else "",
                         parent_shas=[str(p) for p in commit.parent_ids],
