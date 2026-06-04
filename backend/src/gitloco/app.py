@@ -1,6 +1,22 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+
+def _display_path(p: Path) -> str:
+    """Render a filesystem path with the user's home directory collapsed to
+    ``~``. Falls back to the absolute path when the target isn't under home."""
+    try:
+        home = Path.home()
+    except RuntimeError:
+        return str(p)
+    try:
+        rel = p.relative_to(home)
+    except ValueError:
+        return str(p)
+    if str(rel) in ("", "."):
+        return "~"
+    return f"~/{rel.as_posix()}"
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -50,7 +66,7 @@ def create_app(settings: Settings) -> FastAPI:
         return {
             "status": "ok",
             "version": __version__,
-            "repo": str(settings.repo_path),
+            "repo": _display_path(settings.repo_path),
         }
 
     # Serve the built frontend (if it was bundled into the package). Mounted
