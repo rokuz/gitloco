@@ -1,7 +1,8 @@
 import { chromium } from "playwright-core";
+import { findChrome } from "./find-chrome.mjs";
 
 const OUT = "/Users/romankuznetsov/Dev/Projects/GitLoco/docs/img";
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME = findChrome();
 const URL = "http://127.0.0.1:5173/";
 
 async function snap(page, name) {
