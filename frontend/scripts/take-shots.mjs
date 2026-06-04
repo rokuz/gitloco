@@ -3,7 +3,9 @@ import { findChrome } from "./find-chrome.mjs";
 
 const OUT = "/Users/romankuznetsov/Dev/Projects/GitLoco/docs/img";
 const CHROME = findChrome();
-const URL = "http://127.0.0.1:5173/";
+// Defaults to the Vite dev server; override with GITLOCO_SHOTS_URL to point at
+// a single-process `gitloco` instance (UI + API on one port).
+const URL = process.env.GITLOCO_SHOTS_URL ?? "http://127.0.0.1:5173/";
 
 async function snap(page, name) {
   await page.screenshot({ path: `${OUT}/${name}`, fullPage: false });
