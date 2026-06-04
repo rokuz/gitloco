@@ -21,7 +21,7 @@ from __future__ import annotations
 import pygit2
 from sqlmodel import Session, select
 
-from gitloco.models import CommitRewrite, Thread
+from gitloco.models import CommitRewrite, CommitVersion, Thread
 from gitloco.repo import WORKING_TREE_SHA
 
 IdentityKey = tuple[str, str, int]  # (subject, author_email, author_time)
@@ -142,11 +142,54 @@ def orphaned_threads(session: Session, repo: pygit2.Repository) -> list[Thread]:
     ]
 
 
+def _migrate_versions(session: Session, old_sha: str, new_sha: str) -> None:
+    """Move a commit's captured versions onto its rewritten SHA so V1..Vn stay
+    one continuous sequence for the logical commit. Renumbers old-then-new."""
+    old_versions = list(
+        session.exec(
+            select(CommitVersion)
+            .where(CommitVersion.commit_sha == old_sha)
+            .order_by(CommitVersion.version_number)
+        ).all()
+    )
+    if not old_versions:
+        return
+    existing_new = list(
+        session.exec(
+            select(CommitVersion)
+            .where(CommitVersion.commit_sha == new_sha)
+            .order_by(CommitVersion.version_number)
+        ).all()
+    )
+    for i, v in enumerate([*old_versions, *existing_new], start=1):
+        v.commit_sha = new_sha
+        v.version_number = i
+        session.add(v)
+    session.flush()
+
+
 def record_rewrite(
     session: Session, repo: pygit2.Repository, old_sha: str, new_sha: str
 ) -> int:
-    """Store an old→new rewrite and immediately reconcile. Returns threads
-    migrated as a result."""
+    """Record an old→new commit rewrite: carry the commit's version history
+    forward onto the new SHA, capture the new content as the next version, and
+    reconcile orphaned threads. Returns the number of threads migrated."""
+    # Local import avoids a module-level cycle (snapshots is heavier).
+    from gitloco.snapshots import capture_version
+
     session.add(CommitRewrite(old_sha=old_sha, new_sha=new_sha))
+    _migrate_versions(session, old_sha, new_sha)
+    session.commit()
+
+    # Capture the rewritten commit's content. Dedup means this appends a new
+    # version only if the content actually changed (it normally has).
+    capture_version(
+        repo=repo,
+        session=session,
+        commit_sha=new_sha,
+        trigger="rewrite",
+        triggering_thread_id=None,
+        triggering_reply_id=None,
+    )
     session.commit()
     return reconcile_threads(session, repo)

@@ -63,7 +63,7 @@ export interface NewThreadIn {
   body: string;
 }
 
-export type VersionTrigger = "thread_created" | "reply";
+export type VersionTrigger = "thread_created" | "reply" | "rewrite";
 
 export interface CommitVersion {
   version_number: number;

@@ -12,8 +12,13 @@ function versionLabel(v: CommitVersion): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-  const trigger = v.trigger === "thread_created" ? "thread" : "reply";
-  return `V${v.version_number} · ${trigger} · ${time}`;
+  const kind =
+    v.trigger === "thread_created"
+      ? "initial"
+      : v.trigger === "rewrite"
+        ? "fix"
+        : "edit";
+  return `V${v.version_number} · ${kind} · ${time}`;
 }
 
 export function VersionPicker({ versions, fromName, toName, onChange }: Props) {

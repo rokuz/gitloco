@@ -67,18 +67,20 @@ def test_agent_can_reply_human_can_resolve(client: TestClient, latest_sha: str):
     assert r.status_code == 409
 
 
-def test_human_reply_creates_new_commit_version(client: TestClient, latest_sha: str):
+def test_comments_do_not_multiply_versions(client: TestClient, latest_sha: str):
+    """Versions track content states, not comments: thread creation captures V1
+    and further comments on the (unchanged) commit add no versions."""
     tid = _new_thread(client, latest_sha).json()["id"]
-    # V1 from the thread creation.
     versions = client.get(f"/api/commits/{latest_sha}/versions").json()
     assert [v["version_number"] for v in versions] == [1]
     assert versions[0]["trigger"] == "thread_created"
 
-    # Human reply → V2.
-    client.post(f"/api/threads/{tid}/replies", json={"body": "actually, see line 4"})
+    # Three more comments, commit content unchanged → still just V1.
+    client.post(f"/api/threads/{tid}/replies", json={"body": "one more thing"})
+    client.post(f"/api/threads/{tid}/replies", json={"body": "and another"})
+    _new_thread(client, latest_sha, "separate comment")
     versions = client.get(f"/api/commits/{latest_sha}/versions").json()
-    assert [v["version_number"] for v in versions] == [1, 2]
-    assert versions[1]["trigger"] == "reply"
+    assert [v["version_number"] for v in versions] == [1]
 
 
 def test_agent_reply_does_not_create_new_version(

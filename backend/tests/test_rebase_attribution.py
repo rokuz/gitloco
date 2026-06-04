@@ -113,3 +113,33 @@ def test_resolve_still_works_after_reattach(
     assert [t["id"] for t in client.get(f"/api/threads?sha={new_sha}").json()] == [tid]
     r = client.post(f"/api/threads/{tid}/resolve")
     assert r.status_code == 200 and r.json()["status"] == "resolved"
+
+
+def test_rewrite_appends_a_version_and_history_follows(
+    client: TestClient, latest_sha: str, repo_dir: Path
+):
+    """A comment captures V1 (original content). When the AI rewrites the
+    commit and records it, the new content becomes V2 — and both versions live
+    under the current SHA so they can be compared."""
+    _new_thread(client, latest_sha)  # captures V1 (original commit content)
+    assert [v["version_number"] for v in client.get(
+        f"/api/commits/{latest_sha}/versions"
+    ).json()] == [1]
+
+    old_sha, new_sha = _amend_head(
+        repo_dir, "def greet(name: str) -> None:\n    print('hi', name)\n"
+    )
+    r = client.post(
+        "/api/commits/rewrites", json={"old_sha": old_sha, "new_sha": new_sha}
+    )
+    assert r.status_code == 200
+
+    # Both versions now live under the new SHA, oldest first.
+    versions = client.get(f"/api/commits/{new_sha}/versions").json()
+    assert [v["version_number"] for v in versions] == [1, 2]
+    # And comparing them shows the AI's change.
+    cmp = client.get(
+        f"/api/commits/{new_sha}/compare?from=V1&to=V2"
+    ).json()
+    patches = "\n".join(f["patch_text"] for f in cmp["files"])
+    assert "print('hi', name)" in patches

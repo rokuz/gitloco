@@ -195,7 +195,10 @@ def reply_to_thread(
         session.add(reply)
         session.flush()
 
-        # Human replies trigger a new commit version capture. Agent replies do not.
+        # A human reply re-checks the commit's content and captures a new
+        # version only if it actually changed since the last one (dedup). It
+        # does not create a version just for the comment. Agent replies don't
+        # capture — the agent records content changes via record_commit_rewrite.
         if author == "human":
             capture_version(
                 repo=repo,

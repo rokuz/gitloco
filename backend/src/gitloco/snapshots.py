@@ -157,28 +157,30 @@ def capture_version(
     triggering_thread_id: int | None,
     triggering_reply_id: int | None,
     primary_file_path: str | None = None,
-) -> tuple[CommitVersion, Snapshot | None, Snapshot | None]:
-    """Capture a new V_n for ``commit_sha``: walk the commit's diff and store a
-    ``CommitVersionFile`` row per file, with deduped ``Snapshot`` rows on both
-    sides. Returns the version + (parent_snapshot, commit_snapshot) for the
-    ``primary_file_path`` (so callers can also denormalize onto Thread).
-    """
-    version = CommitVersion(
-        commit_sha=commit_sha,
-        version_number=_next_version_number(session, commit_sha),
-        trigger=trigger,
-        triggering_thread_id=triggering_thread_id,
-        triggering_reply_id=triggering_reply_id,
-    )
-    session.add(version)
-    session.flush()  # assign version.id
+) -> tuple[CommitVersion | None, Snapshot | None, Snapshot | None]:
+    """Capture the commit's current content as a version — but ONLY if it
+    differs from the latest captured version.
 
+    Versions track distinct content *states* of the commit, not comment
+    actions: leaving a comment when nothing changed reuses the existing
+    version (no duplicate). A new version appears when the content actually
+    changes — e.g. the AI amends/rebases the commit, or the working tree is
+    edited.
+
+    Returns ``(version_or_None, parent_snapshot, commit_snapshot)`` where the
+    snapshots are for ``primary_file_path`` so callers can denormalize onto a
+    Thread. ``version`` is None when no new version was needed (content
+    unchanged) or the diff couldn't be computed.
+    """
     try:
         diff, parent_sha = _diff_and_parent_sha(repo, commit_sha)
     except (KeyError, ValueError):
-        return version, None, None
+        return None, None, None
     diff.find_similar()
 
+    # Walk the diff once and materialize the snapshots (globally deduped by
+    # content hash) without committing to a version yet.
+    file_records: list[dict] = []
     primary_parent: Snapshot | None = None
     primary_commit: Snapshot | None = None
     seen_primary = False
@@ -223,16 +225,15 @@ def capture_version(
             else None
         )
 
-        session.add(
-            CommitVersionFile(
-                version_id=version.id,  # type: ignore[arg-type]
-                file_path=file_path_key,
-                status=status,
-                old_path=old_path,
-                new_path=new_path,
-                parent_snapshot_id=parent_snap.id if parent_snap else None,
-                commit_snapshot_id=commit_snap.id if commit_snap else None,
-            )
+        file_records.append(
+            {
+                "file_path": file_path_key,
+                "status": status,
+                "old_path": old_path,
+                "new_path": new_path,
+                "parent_snap": parent_snap,
+                "commit_snap": commit_snap,
+            }
         )
 
         if primary_file_path and file_path_key == primary_file_path:
@@ -241,34 +242,100 @@ def capture_version(
             seen_primary = True
 
     # Edge case: the commented file isn't actually touched by this commit
-    # (e.g. clicked on a "normal" context line). Capture it explicitly so we
-    # preserve what the human was looking at.
+    # (e.g. clicked on a "normal" context line). Capture it so we preserve what
+    # the human was looking at — but don't add it to the version file set.
     if primary_file_path and not seen_primary:
         if commit_sha == WORKING_TREE_SHA:
-            commit_bytes = _read_workdir_file(repo, primary_file_path)
+            pc = _read_workdir_file(repo, primary_file_path)
         else:
-            commit_bytes = _read_blob_at_commit(repo, commit_sha, primary_file_path)
-        parent_bytes = _read_blob_at_commit(repo, parent_sha, primary_file_path)
-        if commit_bytes is not None:
+            pc = _read_blob_at_commit(repo, commit_sha, primary_file_path)
+        pp = _read_blob_at_commit(repo, parent_sha, primary_file_path)
+        if pc is not None:
             primary_commit = _get_or_create_snapshot(
                 session,
                 file_path=primary_file_path,
-                content=commit_bytes,
+                content=pc,
                 originating_commit_sha=(
                     None if commit_sha == WORKING_TREE_SHA else commit_sha
                 ),
                 kind=("working_tree" if commit_sha == WORKING_TREE_SHA else "commit"),
             )
-        if parent_bytes is not None:
+        if pp is not None:
             primary_parent = _get_or_create_snapshot(
                 session,
                 file_path=primary_file_path,
-                content=parent_bytes,
+                content=pp,
                 originating_commit_sha=parent_sha,
                 kind="parent",
             )
 
+    # Content fingerprint of this state — dedup against the latest version.
+    fingerprint = _fingerprint(file_records)
+    latest = session.exec(
+        select(CommitVersion)
+        .where(CommitVersion.commit_sha == commit_sha)
+        .order_by(CommitVersion.version_number.desc())  # type: ignore[union-attr]
+    ).first()
+    if latest is not None and _version_fingerprint(session, latest) == fingerprint:
+        # Content unchanged since the last version — no new version needed.
+        return None, primary_parent, primary_commit
+
+    version = CommitVersion(
+        commit_sha=commit_sha,
+        version_number=_next_version_number(session, commit_sha),
+        trigger=trigger,
+        triggering_thread_id=triggering_thread_id,
+        triggering_reply_id=triggering_reply_id,
+    )
+    session.add(version)
+    session.flush()  # assign version.id
+    for rec in file_records:
+        session.add(
+            CommitVersionFile(
+                version_id=version.id,  # type: ignore[arg-type]
+                file_path=rec["file_path"],
+                status=rec["status"],
+                old_path=rec["old_path"],
+                new_path=rec["new_path"],
+                parent_snapshot_id=rec["parent_snap"].id if rec["parent_snap"] else None,
+                commit_snapshot_id=rec["commit_snap"].id if rec["commit_snap"] else None,
+            )
+        )
     return version, primary_parent, primary_commit
+
+
+def _fingerprint(file_records: list[dict]) -> tuple:
+    """A stable content fingerprint for a set of captured files: which files,
+    and their parent/commit content hashes."""
+    return tuple(
+        sorted(
+            (
+                rec["file_path"],
+                rec["parent_snap"].content_hash if rec["parent_snap"] else None,
+                rec["commit_snap"].content_hash if rec["commit_snap"] else None,
+            )
+            for rec in file_records
+        )
+    )
+
+
+def _version_fingerprint(session: Session, version: CommitVersion) -> tuple:
+    """Same fingerprint shape, computed from a stored version's files."""
+    rows = session.exec(
+        select(CommitVersionFile).where(CommitVersionFile.version_id == version.id)
+    ).all()
+    out = []
+    for r in rows:
+        parent_hash = None
+        commit_hash = None
+        if r.parent_snapshot_id is not None:
+            s = session.get(Snapshot, r.parent_snapshot_id)
+            parent_hash = s.content_hash if s else None
+        if r.commit_snapshot_id is not None:
+            s = session.get(Snapshot, r.commit_snapshot_id)
+            commit_hash = s.content_hash if s else None
+        out.append((r.file_path, parent_hash, commit_hash))
+    return tuple(sorted(out))
 
 
 def snapshot_text(session: Session, snapshot_id: int | None) -> str | None:
