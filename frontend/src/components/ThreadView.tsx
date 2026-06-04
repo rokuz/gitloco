@@ -66,8 +66,11 @@ export function ThreadView({ thread }: Props) {
               type="button"
               onClick={() => resolveMutation.mutate()}
               disabled={resolveMutation.isPending}
-              className="text-xs text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded border border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-300 dark:hover:bg-emerald-950/40 disabled:opacity-50 px-3 py-1 text-sm"
             >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path d="M3 8.5l3.5 3.5L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
               Resolve thread
             </button>
             <button
