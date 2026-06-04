@@ -59,12 +59,18 @@
   cursor: pointer;
 }
 
-/* Prism/refractor token colors — dark theme, high contrast */
+/* Prism/refractor token colors — dark theme, high contrast.
+   Make the cell itself a default-color container so token spans win. */
+.diff-code,
+.diff-code-insert,
+.diff-code-delete { color: #e6e8eb; }
+
 .token.comment,
 .token.prolog,
 .token.doctype,
 .token.cdata { color: #8b949e; font-style: italic; }
-.token.punctuation { color: #c9d1d9; }
+.token.punctuation,
+.token.double-colon { color: #c9d1d9; }
 .token.namespace { opacity: 0.85; }
 .token.property,
 .token.tag,
@@ -78,7 +84,11 @@
 .token.string,
 .token.char,
 .token.builtin,
+.token.triple-quoted-string,
+.token.string-interpolation,
 .token.inserted { color: #a5d6ff; }
+.token.interpolation { color: #ffa657; }
+.token.interpolation-punctuation { color: #ff7b72; }
 .token.operator,
 .token.entity,
 .token.url,
@@ -86,7 +96,10 @@
 .style .token.string { color: #ff7b72; }
 .token.atrule,
 .token.attr-value,
-.token.keyword { color: #ff7b72; font-weight: 600; }
+.token.keyword,
+.token.macro,
+.token.directive,
+.token.directive-hash { color: #ff7b72; font-weight: 600; }
 .token.function,
 .token.function-variable { color: #d2a8ff; }
 .token.class-name,
@@ -98,5 +111,3 @@
 .token.bold { font-weight: bold; }
 .token.italic { font-style: italic; }
 .token.entity { cursor: help; }
-/* Make sure the diff cells let token colors win over inherited light gray */
-.diff-code .token { color: inherit; }

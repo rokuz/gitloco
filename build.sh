@@ -17,6 +17,11 @@ STATIC="$ROOT/backend/src/gitloco/static"
 rm -rf "$STATIC"
 cp -r "$ROOT/frontend/dist" "$STATIC"
 
+# uv caches the built wheel by version — without a clean, a reinstall after a
+# rebuild can keep serving the old UI even though the source has new files.
+echo "==> Clearing uv build cache for gitloco"
+uv cache clean gitloco >/dev/null 2>&1 || true
+
 echo
 echo "Frontend bundled into $STATIC"
 echo "Next:"
