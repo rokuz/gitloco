@@ -6,9 +6,9 @@ export function initialTheme(): Theme {
   if (typeof window === "undefined") return "light";
   const saved = window.localStorage.getItem(STORAGE_KEY);
   if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  // Default to light; the user can switch to dark via the header toggle and
+  // their choice is remembered.
+  return "light";
 }
 
 export function applyTheme(theme: Theme) {
