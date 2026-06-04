@@ -14,28 +14,47 @@ Local code-review tool for AI-generated git changes. A human leaves comments on 
 - LAN-accessible — open the same URL from your phone on the couch.
 - Single-user local. No auth, no multi-tenancy.
 
-## Quick start
+## Install
 
 ```bash
-# One-time install
-( cd backend  && uv sync )
-( cd frontend && npm install )
-
-# Run backend + frontend together (defaults to the current directory)
-./run.sh                 # opens http://localhost:5173
-
-# Or point it at another repo
-./run.sh /path/to/repo
+# Clone, build the bundled UI, then install the CLI globally.
+git clone <repo> gitloco
+cd gitloco
+./build.sh                    # builds the frontend + bundles it into the backend package
+( cd backend && uv tool install . )
 ```
 
-To wire Claude Code into the running server (so the `/gitloco` slash command and the `gitloco` MCP tools appear), run once in the repo you want to review:
+`build.sh` runs `npm install`/`npm run build` and copies the dist into `backend/src/gitloco/static/`. `uv tool install .` puts a `gitloco` binary on your `$PATH` (typically `~/.local/bin/gitloco`).
+
+## Use
+
+From any git repository:
 
 ```bash
 cd /path/to/your/repo
-gitloco --install-mcp    # writes .mcp.json + .claude/commands/gitloco.md
+gitloco                       # serves UI + API on http://localhost:7777, opens browser
+```
+
+To wire Claude Code into the running server (so the `/gitloco` slash command and the `gitloco` MCP tools appear), run once per repo you want to review:
+
+```bash
+cd /path/to/your/repo
+gitloco --install-mcp         # writes .mcp.json + .claude/commands/gitloco.md
 ```
 
 On first launch macOS may prompt to allow the Python process to accept incoming connections. Click **Allow** and the LAN URL (printed on startup) becomes reachable from your phone on the same Wi‑Fi.
+
+## Develop GitLoco itself
+
+The `./run.sh` script starts the backend (with hot module reload for code changes via uvicorn restart) and Vite together, against GitLoco's own repo by default:
+
+```bash
+( cd backend  && uv sync )
+( cd frontend && npm install )
+./run.sh                      # opens http://localhost:5173 (Vite, proxies /api to backend)
+```
+
+`./run.sh` is for working on GitLoco itself. End users don't need it — `gitloco` after install does the same thing from one port.
 
 ## Screenshots
 

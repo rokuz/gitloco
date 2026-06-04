@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from gitloco import __version__
 from gitloco.config import Settings
@@ -51,5 +52,13 @@ def create_app(settings: Settings) -> FastAPI:
             "version": __version__,
             "repo": str(settings.repo_path),
         }
+
+    # Serve the built frontend (if it was bundled into the package). Mounted
+    # last so /api/* and /mcp/* keep priority. With html=True, StaticFiles
+    # falls back to index.html for SPA routes. When missing (dev mode where
+    # the frontend is served by Vite separately), the mount is skipped.
+    static_dir = Path(__file__).parent / "static"
+    if (static_dir / "index.html").exists():
+        app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
 
     return app
