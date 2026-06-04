@@ -139,6 +139,10 @@ def _install_claude_md_section(repo_root: Path) -> tuple[Path, str]:
     return target, "appended"
 
 
+def _mcp_url(port: int) -> str:
+    return f"http://127.0.0.1:{port}/mcp/"
+
+
 def _install_mcp_config(repo_root: Path, *, port: int) -> Path:
     target = repo_root / MCP_CONFIG_RELPATH
     config: dict = {}
@@ -148,9 +152,39 @@ def _install_mcp_config(repo_root: Path, *, port: int) -> Path:
         except (json.JSONDecodeError, OSError):
             config = {}
     servers = config.setdefault("mcpServers", {})
-    servers["gitloco"] = {"type": "http", "url": f"http://127.0.0.1:{port}/mcp/"}
+    servers["gitloco"] = {"type": "http", "url": _mcp_url(port)}
     target.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     return target
+
+
+def _sync_mcp_port(repo_root: Path, *, port: int) -> bool:
+    """Keep .mcp.json's gitloco URL pointing at the port we actually bound to.
+
+    `gitloco` falls back to a random free port when the requested one is taken,
+    which leaves a stale URL in .mcp.json and breaks Claude Code's connection.
+    Update it in place on every startup. Only touches an existing gitloco entry
+    (we don't create the file — that's opt-in via --install-mcp). Returns True
+    if the URL was changed.
+    """
+    target = repo_root / MCP_CONFIG_RELPATH
+    if not target.exists():
+        return False
+    try:
+        config = json.loads(target.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+    entry = config.get("mcpServers", {}).get("gitloco")
+    if not isinstance(entry, dict):
+        return False
+    want = _mcp_url(port)
+    if entry.get("url") == want:
+        return False
+    entry["url"] = want
+    try:
+        target.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        return False
+    return True
 
 
 @click.command()
@@ -240,6 +274,11 @@ def main(
     lan_ip = _detect_lan_ip() if host in ("0.0.0.0", "::") else None
     lan_url = f"http://{lan_ip}:{chosen_port}" if lan_ip else None
 
+    # Keep .mcp.json pointing at the port we actually bound to, so Claude Code's
+    # MCP connection doesn't break when we fall back off the requested port.
+    if _sync_mcp_port(repo_root, port=chosen_port):
+        click.echo(f"Updated {MCP_CONFIG_RELPATH} → {_mcp_url(chosen_port)}")
+
     app = create_app(settings)
     click.echo(f"GitLoco {__version__}  ·  {repo_root}")
     click.echo(f"  Local:   {loopback_url}")
@@ -247,6 +286,7 @@ def main(
         click.echo(f"  Network: {lan_url}")
     elif host == "0.0.0.0":
         click.echo("  Network: (could not detect LAN IP)")
+    click.echo(f"  MCP:     {_mcp_url(chosen_port)}")
     click.echo("  Ctrl-C to stop")
 
     if not no_browser:
