@@ -7,10 +7,15 @@ on:
 
 jobs:
   backend:
-    name: Backend (Python 3.12)
-    runs-on: ubuntu-latest
+    name: Backend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     defaults:
       run:
+        shell: bash
         working-directory: backend
     steps:
       - uses: actions/checkout@v5
@@ -31,10 +36,15 @@ jobs:
         run: uv run pytest -q
 
   frontend:
-    name: Frontend (Node 22)
-    runs-on: ubuntu-latest
+    name: Frontend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     defaults:
       run:
+        shell: bash
         working-directory: frontend
     steps:
       - uses: actions/checkout@v5

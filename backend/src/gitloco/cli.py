@@ -60,6 +60,49 @@ def _ensure_data_dir(data_dir: Path) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
 
 
+def _file_log_config(log_file: Path) -> dict:
+    """uvicorn logging config that writes the server + access logs to a file
+    instead of the console, so the terminal stays clean (just our own echoes)."""
+    return {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "default": {
+                "()": "uvicorn.logging.DefaultFormatter",
+                "fmt": "%(asctime)s %(levelprefix)s %(message)s",
+                "use_colors": False,
+            },
+            "access": {
+                "()": "uvicorn.logging.AccessFormatter",
+                "fmt": '%(asctime)s %(levelprefix)s %(client_addr)s - '
+                '"%(request_line)s" %(status_code)s',
+                "use_colors": False,
+            },
+        },
+        "handlers": {
+            "default": {
+                "class": "logging.FileHandler",
+                "filename": str(log_file),
+                "formatter": "default",
+            },
+            "access": {
+                "class": "logging.FileHandler",
+                "filename": str(log_file),
+                "formatter": "access",
+            },
+        },
+        "loggers": {
+            "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
+            "uvicorn.error": {"level": "INFO"},
+            "uvicorn.access": {
+                "handlers": ["access"],
+                "level": "INFO",
+                "propagate": False,
+            },
+        },
+    }
+
+
 def _ensure_gitignore(repo_root: Path) -> None:
     gitignore = repo_root / ".gitignore"
     if gitignore.exists():
@@ -280,6 +323,7 @@ def main(
         click.echo(f"Updated {MCP_CONFIG_RELPATH} → {_mcp_url(chosen_port)}")
 
     app = create_app(settings)
+    log_file = settings.data_dir / "server.log"
     click.echo(f"GitLoco {__version__}  ·  {repo_root}")
     click.echo(f"  Local:   {loopback_url}")
     if lan_url:
@@ -287,12 +331,18 @@ def main(
     elif host == "0.0.0.0":
         click.echo("  Network: (could not detect LAN IP)")
     click.echo(f"  MCP:     {_mcp_url(chosen_port)}")
+    click.echo(f"  Logs:    {log_file}")
     click.echo("  Ctrl-C to stop")
 
     if not no_browser:
         _open_browser_when_ready(loopback_url)
 
-    uvicorn.run(app, host=host, port=chosen_port, log_level="info")
+    uvicorn.run(
+        app,
+        host=host,
+        port=chosen_port,
+        log_config=_file_log_config(log_file),
+    )
 
 
 if __name__ == "__main__":
