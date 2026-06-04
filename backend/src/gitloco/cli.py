@@ -27,16 +27,24 @@ CLAUDE_MD_START = "<!-- gitloco-start"
 CLAUDE_MD_END = "<!-- gitloco-end -->"
 
 
-def _find_free_port(preferred: int, host: str) -> int:
+def _port_in_use(port: int, host: str) -> bool:
+    bind_host = "" if host in ("0.0.0.0", "::") else host
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.bind((host, preferred))
-            return preferred
+            s.bind((bind_host, port))
+            return False
         except OSError:
-            pass
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((host, 0))
-        return s.getsockname()[1]
+            return True
+
+
+def _kill_port_command(port: int) -> str:
+    """A shell command that kills whatever process is holding ``port``."""
+    if sys.platform == "win32":
+        return (
+            f'for /f "tokens=5" %a in (\'netstat -ano ^| findstr :{port} '
+            f"^| findstr LISTENING') do taskkill /PID %a /F"
+        )
+    return f"lsof -ti tcp:{port} | xargs kill"
 
 
 def _detect_lan_ip() -> str | None:
@@ -312,13 +320,22 @@ def main(
     _ensure_data_dir(settings.data_dir)
     _ensure_gitignore(repo_root)
 
-    chosen_port = _find_free_port(port, host)
+    if _port_in_use(port, host):
+        click.echo(f"error: port {port} is already in use.", err=True)
+        click.echo("Another process (perhaps a stale gitloco) is holding it.", err=True)
+        click.echo("  • start on a different port:  gitloco --port <PORT>", err=True)
+        click.echo(
+            f"  • or free port {port} and retry:  {_kill_port_command(port)}", err=True
+        )
+        sys.exit(1)
+
+    chosen_port = port
     loopback_url = f"http://127.0.0.1:{chosen_port}"
     lan_ip = _detect_lan_ip() if host in ("0.0.0.0", "::") else None
     lan_url = f"http://{lan_ip}:{chosen_port}" if lan_ip else None
 
-    # Keep .mcp.json pointing at the port we actually bound to, so Claude Code's
-    # MCP connection doesn't break when we fall back off the requested port.
+    # Keep .mcp.json pointing at the chosen port, so Claude Code's MCP connection
+    # tracks a non-default --port.
     if _sync_mcp_port(repo_root, port=chosen_port):
         click.echo(f"Updated {MCP_CONFIG_RELPATH} → {_mcp_url(chosen_port)}")
 
