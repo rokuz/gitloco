@@ -42,10 +42,10 @@ export function ThreadView({ thread }: Props) {
         className="flex w-full items-center gap-2 px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-800 text-xs text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
       >
         <svg
-          width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden
-          className={["shrink-0 text-zinc-500 transition-transform", collapsed ? "-rotate-90" : ""].join(" ")}
+          width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden
+          className={["shrink-0 text-zinc-700 dark:text-zinc-300 transition-transform", collapsed ? "-rotate-90" : ""].join(" ")}
         >
-          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <span className="shrink-0 text-zinc-600 dark:text-zinc-400">
           Thread #{thread.id} ·{" "}

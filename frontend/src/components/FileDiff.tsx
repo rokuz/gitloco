@@ -291,17 +291,17 @@ function FileHeader({
 function Chevron({ collapsed }: { collapsed: boolean }) {
   return (
     <svg
-      width="12"
-      height="12"
+      width="16"
+      height="16"
       viewBox="0 0 16 16"
       fill="none"
       aria-hidden
       className={[
-        "shrink-0 text-zinc-500 transition-transform",
+        "shrink-0 text-zinc-700 dark:text-zinc-300 transition-transform",
         collapsed ? "-rotate-90" : "",
       ].join(" ")}
     >
-      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
