@@ -19,6 +19,9 @@ import json
 GITIGNORE_ENTRY = ".gitloco/\n"
 CLAUDE_COMMAND_RELPATH = Path(".claude/commands/gitloco.md")
 MCP_CONFIG_RELPATH = Path(".mcp.json")
+CLAUDE_MD_RELPATH = Path("CLAUDE.md")
+CLAUDE_MD_START = "<!-- gitloco-start"
+CLAUDE_MD_END = "<!-- gitloco-end -->"
 
 
 def _find_free_port(preferred: int, host: str) -> int:
@@ -83,6 +86,41 @@ def _install_claude_command(repo_root: Path, *, force: bool) -> Path:
         raise FileExistsError(target)
     target.write_text(template, encoding="utf-8")
     return target
+
+
+def _install_claude_md_section(repo_root: Path) -> tuple[Path, str]:
+    """Append (or replace) the GitLoco stanza in the repo's CLAUDE.md.
+
+    Returns ``(path, action)`` where action is one of ``"created"``,
+    ``"appended"``, or ``"updated"`` so the caller can log accurately.
+    """
+    section = (
+        files("gitloco.templates").joinpath("claude_md_section.md").read_text()
+    )
+    target = repo_root / CLAUDE_MD_RELPATH
+    if not target.exists():
+        target.write_text(section if section.endswith("\n") else section + "\n", encoding="utf-8")
+        return target, "created"
+
+    existing = target.read_text(encoding="utf-8")
+    start_idx = existing.find(CLAUDE_MD_START)
+    end_idx = existing.find(CLAUDE_MD_END)
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        # Replace the existing GitLoco block in place.
+        end_after = end_idx + len(CLAUDE_MD_END)
+        # Strip a trailing newline immediately after the end marker so we don't
+        # accumulate blank lines on each rewrite.
+        if end_after < len(existing) and existing[end_after] == "\n":
+            end_after += 1
+        new_body = section if section.endswith("\n") else section + "\n"
+        merged = existing[:start_idx] + new_body + existing[end_after:]
+        target.write_text(merged, encoding="utf-8")
+        return target, "updated"
+
+    # Append below the existing content with a blank-line separator.
+    separator = "" if existing.endswith("\n\n") else ("\n" if existing.endswith("\n") else "\n\n")
+    target.write_text(existing + separator + section, encoding="utf-8")
+    return target, "appended"
 
 
 def _install_mcp_config(repo_root: Path, *, port: int) -> Path:
@@ -164,6 +202,8 @@ def main(
         if install_mcp:
             mcp_target = _install_mcp_config(repo_root, port=port)
             click.echo(f"Wrote {mcp_target} (gitloco entry → http://127.0.0.1:{port}/mcp/)")
+            claude_md_target, action = _install_claude_md_section(repo_root)
+            click.echo(f"{action.capitalize()} {claude_md_target} (GitLoco review section)")
         return
     settings = Settings.for_repo(repo_root)
     _ensure_data_dir(settings.data_dir)
