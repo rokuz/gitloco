@@ -46,15 +46,15 @@ On first launch macOS may prompt to allow the Python process to accept incoming 
 
 ## Develop GitLoco itself
 
-The `./run.sh` script starts the backend (with hot module reload for code changes via uvicorn restart) and Vite together, against GitLoco's own repo by default:
+The `./test.sh` script starts the backend and Vite together, against GitLoco's own repo by default:
 
 ```bash
 ( cd backend  && uv sync )
 ( cd frontend && npm install )
-./run.sh                      # opens http://localhost:5173 (Vite, proxies /api to backend)
+./test.sh                      # opens http://localhost:5173 (Vite, proxies /api to backend)
 ```
 
-`./run.sh` is for working on GitLoco itself. End users don't need it — `gitloco` after install does the same thing from one port.
+`./test.sh` is purely a development convenience. End users have the installed `gitloco` command, which serves the same UI + API from a single port without Vite.
 
 ## Screenshots
 

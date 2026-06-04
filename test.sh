@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Start the GitLoco backend and frontend together for development.
+# Run GitLoco's backend + frontend together for *working on GitLoco itself*.
+# End users don't need this — they use the installed `gitloco` command.
 #
 # Usage:
-#   ./dev.sh              # serve the current directory (the GitLoco repo itself)
-#   ./dev.sh /path/to/repo
+#   ./test.sh              # serve the current directory (the GitLoco repo)
+#   ./test.sh /path/to/repo
 #
 # Backend listens on 127.0.0.1:7777; Vite (with /api proxy) on 0.0.0.0:5173.
 # Ctrl-C tears both down.
