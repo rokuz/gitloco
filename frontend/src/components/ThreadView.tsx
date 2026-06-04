@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client";
 import type { Reply, Thread } from "../api/types";
+import { Markdown } from "./Markdown";
 
 interface Props {
   thread: Thread;
@@ -138,7 +139,9 @@ function ReplyRow({ reply }: { reply: Reply }) {
           {new Date(reply.created_at).toLocaleString()}
         </span>
       </div>
-      <p className="whitespace-pre-wrap text-zinc-900 dark:text-zinc-100">{reply.body}</p>
+      <div className="text-zinc-900 dark:text-zinc-100">
+        <Markdown>{reply.body}</Markdown>
+      </div>
     </li>
   );
 }

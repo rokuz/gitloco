@@ -38,3 +38,59 @@ html.dark body {
   background: #0b0d12;
   color: #e6e8eb;
 }
+
+/* Markdown rendering for comment bodies (.gitloco-md). Compact, since comments
+   are small. Tailwind's preflight resets margins, so set them here. */
+.gitloco-md { font-size: 0.875rem; line-height: 1.5; word-break: break-word; }
+.gitloco-md > :first-child { margin-top: 0; }
+.gitloco-md > :last-child { margin-bottom: 0; }
+.gitloco-md p { margin: 0.4em 0; }
+.gitloco-md h1, .gitloco-md h2, .gitloco-md h3,
+.gitloco-md h4, .gitloco-md h5, .gitloco-md h6 {
+  margin: 0.6em 0 0.3em; font-weight: 600; line-height: 1.25;
+}
+.gitloco-md h1 { font-size: 1.15em; }
+.gitloco-md h2 { font-size: 1.1em; }
+.gitloco-md h3 { font-size: 1.05em; }
+.gitloco-md h4, .gitloco-md h5, .gitloco-md h6 { font-size: 1em; }
+.gitloco-md ul, .gitloco-md ol { margin: 0.4em 0; padding-left: 1.4em; }
+.gitloco-md ul { list-style: disc; }
+.gitloco-md ol { list-style: decimal; }
+.gitloco-md li { margin: 0.15em 0; }
+.gitloco-md li > ul, .gitloco-md li > ol { margin: 0.15em 0; }
+.gitloco-md a { color: #2563eb; text-decoration: underline; }
+html.dark .gitloco-md a { color: #60a5fa; }
+.gitloco-md code {
+  font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+  font-size: 0.85em;
+  background: rgba(127, 127, 127, 0.18);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.gitloco-md pre {
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 0.6em 0.8em;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+html.dark .gitloco-md pre { background: #11151b; border-color: #2e303a; }
+.gitloco-md pre code { background: none; padding: 0; font-size: 0.85em; }
+.gitloco-md blockquote {
+  margin: 0.5em 0;
+  padding-left: 0.8em;
+  border-left: 3px solid #d0d7de;
+  color: #57606a;
+}
+html.dark .gitloco-md blockquote { border-left-color: #2e303a; color: #9ca3af; }
+.gitloco-md hr { border: none; border-top: 1px solid #d0d7de; margin: 0.8em 0; }
+html.dark .gitloco-md hr { border-top-color: #2e303a; }
+.gitloco-md table { border-collapse: collapse; margin: 0.5em 0; }
+.gitloco-md th, .gitloco-md td {
+  border: 1px solid #d0d7de; padding: 0.3em 0.6em; text-align: left;
+}
+html.dark .gitloco-md th, html.dark .gitloco-md td { border-color: #2e303a; }
+.gitloco-md th { background: rgba(127, 127, 127, 0.12); font-weight: 600; }
+.gitloco-md input[type="checkbox"] { margin-right: 0.4em; }
+.gitloco-md img { max-width: 100%; }
