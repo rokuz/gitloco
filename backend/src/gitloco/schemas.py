@@ -73,10 +73,10 @@ class CommitRewriteIn(BaseModel):
 
 class CommitVersionListItemOut(BaseModel):
     version_number: int
+    commit_hash: str
+    short_hash: str
+    subject: str | None
     created_at: datetime
-    trigger: str
-    triggering_thread_id: int | None
-    triggering_reply_id: int | None
 
 
 class CommitVersionFileOut(BaseModel):
@@ -90,10 +90,8 @@ class CommitVersionFileOut(BaseModel):
 
 class CommitVersionDetailOut(BaseModel):
     version_number: int
+    commit_hash: str
     created_at: datetime
-    trigger: str
-    triggering_thread_id: int | None
-    triggering_reply_id: int | None
     files: list[CommitVersionFileOut]
 
 

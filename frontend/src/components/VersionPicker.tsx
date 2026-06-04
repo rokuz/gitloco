@@ -8,17 +8,7 @@ interface Props {
 }
 
 function versionLabel(v: CommitVersion): string {
-  const time = new Date(v.created_at).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const kind =
-    v.trigger === "thread_created"
-      ? "initial"
-      : v.trigger === "rewrite"
-        ? "fix"
-        : "edit";
-  return `V${v.version_number} · ${kind} · ${time}`;
+  return `V${v.version_number} · ${v.short_hash}`;
 }
 
 export function VersionPicker({ versions, fromName, toName, onChange }: Props) {

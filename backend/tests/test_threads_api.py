@@ -73,7 +73,6 @@ def test_comments_do_not_multiply_versions(client: TestClient, latest_sha: str):
     tid = _new_thread(client, latest_sha).json()["id"]
     versions = client.get(f"/api/commits/{latest_sha}/versions").json()
     assert [v["version_number"] for v in versions] == [1]
-    assert versions[0]["trigger"] == "thread_created"
 
     # Three more comments, commit content unchanged → still just V1.
     client.post(f"/api/threads/{tid}/replies", json={"body": "one more thing"})

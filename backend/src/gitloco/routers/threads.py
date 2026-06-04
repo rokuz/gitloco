@@ -4,19 +4,8 @@ from typing import Literal
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from sqlmodel import Session, select
 
-from gitloco.attribution import (
-    get_commit_identity,
-    orphaned_threads,
-    reconcile_threads,
-    record_rewrite,
-)
-from gitloco.compare import compare_versions
-from gitloco.models import (
-    CommitVersion,
-    CommitVersionFile,
-    Reply,
-    Thread,
-)
+from gitloco import persistence as pc
+from gitloco.models import CommitVersion, Reply, Thread
 from gitloco.schemas import (
     CommitRewriteIn,
     CommitVersionDetailOut,
@@ -29,7 +18,6 @@ from gitloco.schemas import (
     ReplyOut,
     ThreadOut,
 )
-from gitloco.snapshots import capture_version, snapshot_text
 
 router = APIRouter(prefix="/api/threads", tags=["threads"])
 
@@ -48,7 +36,7 @@ def _author_from_header(value: str | None) -> Author:
 def _thread_out(thread: Thread) -> ThreadOut:
     return ThreadOut(
         id=thread.id,  # type: ignore[arg-type]
-        commit_sha=thread.commit_sha,
+        commit_sha=thread.commit_hash,
         file_path=thread.file_path,
         line_side=thread.line_side,
         line_number=thread.line_number,
@@ -77,44 +65,48 @@ def list_threads(
     engine = request.app.state.engine
     repo = request.app.state.repo
     with Session(engine) as session:
-        # Re-attach any threads orphaned by a rebase before we filter by sha,
-        # so a thread shows up under the commit's current SHA.
-        reconcile_threads(session, repo)
-        stmt = select(Thread)
-        if status != "all":
-            stmt = stmt.where(Thread.status == status)
         if sha is not None:
-            stmt = stmt.where(Thread.commit_sha == sha)
-        if path is not None:
-            stmt = stmt.where(Thread.file_path == path)
-        stmt = stmt.order_by(Thread.created_at)
-        threads = session.exec(stmt).all()
-        return [_thread_out(t) for t in threads]
+            threads = pc.threads_for_hash(session, repo, sha)
+        else:
+            threads = list(session.exec(select(Thread).order_by(Thread.created_at)).all())
+        session.commit()  # resolve_pc may have linked a rewritten hash
+        out = []
+        for t in threads:
+            if status != "all" and t.status != status:
+                continue
+            if path is not None and t.file_path != path:
+                continue
+            out.append(_thread_out(t))
+        return out
 
 
 @router.get("/orphans", response_model=list[ThreadOut])
 def list_orphan_threads(request: Request) -> list[ThreadOut]:
-    """Threads whose anchored commit is no longer reachable from HEAD and that
-    could not be auto-reattached (e.g. created before identity capture, or an
-    ambiguous identity match). Surfaced so the human can still resolve them."""
+    """Threads whose persistent commit has no version reachable from HEAD, so
+    they don't appear under any current commit. Surfaced so they can still be
+    resolved."""
     engine = request.app.state.engine
     repo = request.app.state.repo
     with Session(engine) as session:
-        return [_thread_out(t) for t in orphaned_threads(session, repo)]
+        return [_thread_out(t) for t in pc.orphaned_threads(session, repo)]
 
 
 @router.get("/open-counts", response_model=dict[str, int])
 def open_thread_counts(request: Request) -> dict[str, int]:
-    """Number of open threads per commit SHA, keyed by `commit_sha` (after
-    reconciliation). Used to badge commits in the UI's left panel."""
+    """Open-thread count keyed by every commit hash that maps to a persistent
+    commit, so the UI can badge whichever hash a commit row shows."""
     engine = request.app.state.engine
-    repo = request.app.state.repo
     with Session(engine) as session:
-        reconcile_threads(session, repo)
-        rows = session.exec(select(Thread).where(Thread.status == "open")).all()
+        open_by_pc: dict[int, int] = {}
+        for t in session.exec(select(Thread).where(Thread.status == "open")).all():
+            open_by_pc[t.persistent_commit_id] = (
+                open_by_pc.get(t.persistent_commit_id, 0) + 1
+            )
         counts: dict[str, int] = {}
-        for t in rows:
-            counts[t.commit_sha] = counts.get(t.commit_sha, 0) + 1
+        for v in session.exec(select(CommitVersion)).all():
+            n = open_by_pc.get(v.persistent_commit_id, 0)
+            if n:
+                counts[v.commit_hash] = n
         return counts
 
 
@@ -126,8 +118,7 @@ def create_thread(
 ) -> ThreadOut:
     if not payload.body.strip():
         raise HTTPException(status_code=400, detail="body must not be empty")
-    author = _author_from_header(x_gitloco_author)
-    if author != "human":
+    if _author_from_header(x_gitloco_author) != "human":
         raise HTTPException(
             status_code=403,
             detail="only humans may start new threads — agents reply only",
@@ -136,36 +127,19 @@ def create_thread(
     engine = request.app.state.engine
     repo = request.app.state.repo
     with Session(engine) as session:
-        identity = get_commit_identity(repo, payload.commit_sha) or {}
+        pc_id = pc.resolve_pc(session, repo, payload.commit_sha, create=True)
         thread = Thread(
-            commit_sha=payload.commit_sha,
+            persistent_commit_id=pc_id,  # type: ignore[arg-type]
+            commit_hash=payload.commit_sha,
             file_path=payload.file_path,
             line_side=payload.line_side,
             line_number=payload.line_number,
-            **identity,
         )
         session.add(thread)
         session.flush()
-
-        _version, primary_parent, primary_commit = capture_version(
-            repo=repo,
-            session=session,
-            commit_sha=payload.commit_sha,
-            trigger="thread_created",
-            triggering_thread_id=thread.id,
-            triggering_reply_id=None,
-            primary_file_path=payload.file_path,
+        session.add(
+            Reply(thread_id=thread.id, author="human", body=payload.body)  # type: ignore[arg-type]
         )
-        thread.parent_snapshot_id = primary_parent.id if primary_parent else None
-        thread.commit_snapshot_id = primary_commit.id if primary_commit else None
-        session.add(thread)
-
-        root_reply = Reply(
-            thread_id=thread.id,  # type: ignore[arg-type]
-            author="human",
-            body=payload.body,
-        )
-        session.add(root_reply)
         session.commit()
         session.refresh(thread)
         return _thread_out(thread)
@@ -182,7 +156,6 @@ def reply_to_thread(
         raise HTTPException(status_code=400, detail="body must not be empty")
     author = _author_from_header(x_gitloco_author)
     engine = request.app.state.engine
-    repo = request.app.state.repo
     with Session(engine) as session:
         thread = session.get(Thread, thread_id)
         if thread is None:
@@ -191,25 +164,7 @@ def reply_to_thread(
             raise HTTPException(
                 status_code=409, detail="thread is resolved and cannot accept replies"
             )
-        reply = Reply(thread_id=thread_id, author=author, body=payload.body)
-        session.add(reply)
-        session.flush()
-
-        # A human reply re-checks the commit's content and captures a new
-        # version only if it actually changed since the last one (dedup). It
-        # does not create a version just for the comment. Agent replies don't
-        # capture — the agent records content changes via record_commit_rewrite.
-        if author == "human":
-            capture_version(
-                repo=repo,
-                session=session,
-                commit_sha=thread.commit_sha,
-                trigger="reply",
-                triggering_thread_id=thread_id,
-                triggering_reply_id=reply.id,
-                primary_file_path=thread.file_path,
-            )
-
+        session.add(Reply(thread_id=thread_id, author=author, body=payload.body))
         session.commit()
         session.refresh(thread)
         return _thread_out(thread)
@@ -221,21 +176,19 @@ def resolve_thread(
     request: Request,
     x_gitloco_author: str | None = Header(default=None),
 ) -> ThreadOut:
-    author = _author_from_header(x_gitloco_author)
-    if author != "human":
+    if _author_from_header(x_gitloco_author) != "human":
         raise HTTPException(status_code=403, detail="only humans may resolve threads")
     engine = request.app.state.engine
     with Session(engine) as session:
         thread = session.get(Thread, thread_id)
         if thread is None:
             raise HTTPException(status_code=404, detail=f"thread {thread_id} not found")
-        if thread.status == "resolved":
-            return _thread_out(thread)
-        thread.status = "resolved"
-        thread.resolved_at = datetime.now(UTC)
-        session.add(thread)
-        session.commit()
-        session.refresh(thread)
+        if thread.status != "resolved":
+            thread.status = "resolved"
+            thread.resolved_at = datetime.now(UTC)
+            session.add(thread)
+            session.commit()
+            session.refresh(thread)
         return _thread_out(thread)
 
 
@@ -246,13 +199,19 @@ commit_versions_router = APIRouter(prefix="/api/commits", tags=["commit-versions
 
 @commit_versions_router.post("/rewrites", status_code=200)
 def record_commit_rewrite(payload: CommitRewriteIn, request: Request) -> dict:
-    """Record that ``old_sha`` was rewritten to ``new_sha`` (e.g. an amend
-    during rebase) and re-attach affected threads. Returns how many migrated."""
+    """Record that ``old_sha`` was rewritten to ``new_sha`` — appends new_sha as
+    a version of old_sha's persistent commit so threads and version history
+    follow the commit."""
     engine = request.app.state.engine
     repo = request.app.state.repo
     with Session(engine) as session:
-        migrated = record_rewrite(session, repo, payload.old_sha, payload.new_sha)
-    return {"migrated_threads": migrated}
+        added = pc.record_rewrite(session, repo, payload.old_sha, payload.new_sha)
+        session.commit()
+    return {"linked": added}
+
+
+def _short(h: str) -> str:
+    return "WORKING" if h == "WORKING_TREE" else h[:7]
 
 
 @commit_versions_router.get(
@@ -260,23 +219,19 @@ def record_commit_rewrite(payload: CommitRewriteIn, request: Request) -> dict:
 )
 def list_commit_versions(sha: str, request: Request) -> list[CommitVersionListItemOut]:
     engine = request.app.state.engine
+    repo = request.app.state.repo
     with Session(engine) as session:
-        rows = list(
-            session.exec(
-                select(CommitVersion)
-                .where(CommitVersion.commit_sha == sha)
-                .order_by(CommitVersion.version_number)
-            ).all()
-        )
+        versions = pc.versions_for_hash(session, repo, sha)
+        session.commit()
         return [
             CommitVersionListItemOut(
                 version_number=v.version_number,
+                commit_hash=v.commit_hash,
+                short_hash=_short(v.commit_hash),
+                subject=v.subject,
                 created_at=v.created_at,
-                trigger=v.trigger,
-                triggering_thread_id=v.triggering_thread_id,
-                triggering_reply_id=v.triggering_reply_id,
             )
-            for v in rows
+            for v in versions
         ]
 
 
@@ -287,49 +242,23 @@ def compare(
     from_: str = Query("base", alias="from"),
     to: str = Query("latest"),
 ) -> CompareOut:
-    """Compare two captured versions of a commit and return a per-file unified
-    diff suitable for react-diff-view. ``from`` defaults to ``base`` (the
-    commit's parent state). ``to`` defaults to ``latest`` (most recent version).
-    """
+    """Per-file unified diff between two versions of the commit. ``from``
+    defaults to ``base`` (the parent state); ``to`` defaults to ``latest``."""
     engine = request.app.state.engine
+    repo = request.app.state.repo
     with Session(engine) as session:
-        # Resolve "latest" alias for `to`.
-        to_resolved = to
-        if to.lower() == "latest":
-            latest = session.exec(
-                select(CommitVersion)
-                .where(CommitVersion.commit_sha == sha)
-                .order_by(CommitVersion.version_number.desc())  # type: ignore[union-attr]
-            ).first()
-            if latest is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"commit {sha} has no captured versions yet",
-                )
-            to_resolved = f"V{latest.version_number}"
         try:
-            files, from_v, to_v = compare_versions(
-                session, sha=sha, from_name=from_, to_name=to_resolved
-            )
+            result = pc.compare(session, repo, sha, from_, to)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from None
+        session.commit()
         return CompareOut(
             sha=sha,
-            from_name=from_,
-            to_name=to_resolved,
-            from_version_number=from_v.version_number if from_v else None,
-            to_version_number=to_v.version_number if to_v else None,
-            files=[
-                CompareFileOut(
-                    file_path=f.file_path,
-                    status=f.status,
-                    is_binary=f.is_binary,
-                    old_path=f.old_path,
-                    new_path=f.new_path,
-                    patch_text=f.patch_text,
-                )
-                for f in files
-            ],
+            from_name=result["from_name"],
+            to_name=result["to_name"],
+            from_version_number=result["from_version"],
+            to_version_number=result["to_version"],
+            files=[CompareFileOut(**f) for f in result["files"]],
         )
 
 
@@ -338,40 +267,29 @@ def compare(
 )
 def get_commit_version(sha: str, n: int, request: Request) -> CommitVersionDetailOut:
     engine = request.app.state.engine
+    repo = request.app.state.repo
     with Session(engine) as session:
-        version = session.exec(
-            select(CommitVersion).where(
-                CommitVersion.commit_sha == sha,
-                CommitVersion.version_number == n,
-            )
-        ).first()
+        versions = pc.versions_for_hash(session, repo, sha)
+        version = next((v for v in versions if v.version_number == n), None)
         if version is None:
             raise HTTPException(
-                status_code=404,
-                detail=f"commit {sha} has no version {n}",
+                status_code=404, detail=f"commit {sha} has no version {n}"
             )
-        files = list(
-            session.exec(
-                select(CommitVersionFile)
-                .where(CommitVersionFile.version_id == version.id)
-                .order_by(CommitVersionFile.file_path)
-            ).all()
-        )
+        files = pc._version_files(session, version)
+        session.commit()
         return CommitVersionDetailOut(
             version_number=version.version_number,
+            commit_hash=version.commit_hash,
             created_at=version.created_at,
-            trigger=version.trigger,
-            triggering_thread_id=version.triggering_thread_id,
-            triggering_reply_id=version.triggering_reply_id,
             files=[
                 CommitVersionFileOut(
                     file_path=f.file_path,
                     status=f.status,
                     old_path=f.old_path,
                     new_path=f.new_path,
-                    parent_content=snapshot_text(session, f.parent_snapshot_id),
-                    commit_content=snapshot_text(session, f.commit_snapshot_id),
+                    parent_content=pc.snapshot_text(session, f.parent_snapshot_id),
+                    commit_content=pc.snapshot_text(session, f.commit_snapshot_id),
                 )
-                for f in files
+                for f in files.values()
             ],
         )

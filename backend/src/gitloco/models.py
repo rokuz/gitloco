@@ -8,14 +8,15 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-# DB-level values are plain strings; API/schema layer enforces literals.
+# DB-level values are plain strings; the API/schema layer enforces literals.
 # Author: "human" | "agent"
 # ThreadStatus: "open" | "resolved"
 # LineSide: "old" | "new"
-# SnapshotKind: "commit" | "parent" | "working_tree"
 
 
 class Snapshot(SQLModel, table=True):
+    """Deduplicated blob store — file contents keyed by their sha-256 hash."""
+
     __tablename__ = "snapshot"
 
     id: int | None = Field(default=None, primary_key=True)
@@ -23,52 +24,85 @@ class Snapshot(SQLModel, table=True):
     file_path: str
     content: bytes = Field(sa_type=LargeBinary)
     is_binary: bool = False
-    originating_commit_sha: str | None = None
-    originating_kind: str = "commit"
     created_at: datetime = Field(default_factory=_now)
+
+
+class PersistentCommit(SQLModel, table=True):
+    """A *logical* commit that survives rebases. The user's comment threads and
+    every git hash the commit has been (its versions) hang off this. The first
+    comment on a commit creates one; a rewrite just appends a new version hash.
+    """
+
+    __tablename__ = "persistent_commit"
+
+    id: int | None = Field(default=None, primary_key=True)
+    created_at: datetime = Field(default_factory=_now)
+
+
+class CommitVersion(SQLModel, table=True):
+    """One version (content state) of a persistent commit.
+
+    For a real commit, ``commit_hash`` is the git SHA and there is one version
+    per distinct hash (rewrites append). For uncommitted changes there is no
+    SHA, so ``commit_hash`` is the literal ``WORKING_TREE`` and versions are
+    captured per distinct content state.
+    """
+
+    __tablename__ = "commit_version"
+
+    id: int | None = Field(default=None, primary_key=True)
+    persistent_commit_id: int = Field(foreign_key="persistent_commit.id", index=True)
+    version_number: int  # 1, 2, 3, … within the persistent commit
+    commit_hash: str = Field(index=True)  # git SHA, or "WORKING_TREE"
+    created_at: datetime = Field(default_factory=_now)
+    # Identity of the git commit (subject + author), used to auto-link a
+    # rewritten commit to its persistent commit when the agent didn't record
+    # the rewrite explicitly. Null for the working tree.
+    subject: str | None = None
+    author_name: str | None = None
+    author_email: str | None = None
+    author_time: int | None = None  # unix seconds
+
+    files: list["CommitVersionFile"] = Relationship()
+
+
+class CommitVersionFile(SQLModel, table=True):
+    """One file in a version's diff (vs its parent), both sides pointing at
+    deduped ``Snapshot`` rows."""
+
+    __tablename__ = "commit_version_file"
+
+    id: int | None = Field(default=None, primary_key=True)
+    version_id: int = Field(foreign_key="commit_version.id", index=True)
+    file_path: str  # canonical key (new_path if present, else old_path)
+    status: str  # "added" | "modified" | "deleted" | "renamed" | "copied"
+    old_path: str | None = None
+    new_path: str | None = None
+    parent_snapshot_id: int | None = Field(default=None, foreign_key="snapshot.id")
+    commit_snapshot_id: int | None = Field(default=None, foreign_key="snapshot.id")
 
 
 class Thread(SQLModel, table=True):
     __tablename__ = "thread"
 
     id: int | None = Field(default=None, primary_key=True)
-    commit_sha: str = Field(index=True)
+    persistent_commit_id: int = Field(
+        foreign_key="persistent_commit.id", index=True
+    )
+    # The hash/version the comment was made on (a git SHA or "WORKING_TREE").
+    # The line_number is relative to this version's content.
+    commit_hash: str = Field(index=True)
     file_path: str = Field(index=True)
-    parent_snapshot_id: int | None = Field(default=None, foreign_key="snapshot.id")
-    commit_snapshot_id: int | None = Field(default=None, foreign_key="snapshot.id")
     line_side: str
     line_number: int
     status: str = Field(default="open", index=True)
     created_at: datetime = Field(default_factory=_now)
     resolved_at: datetime | None = None
 
-    # Identity of the anchored commit, captured at creation. These fields
-    # survive a rebase/amend (author identity + author time + subject are
-    # preserved even when the SHA changes), so an orphaned thread can be
-    # re-attached to the rewritten commit automatically. Null for the
-    # working-tree pseudo-commit and for threads created before this existed.
-    commit_subject: str | None = None
-    commit_author_name: str | None = None
-    commit_author_email: str | None = None
-    commit_author_time: int | None = None  # unix seconds
-
     replies: list["Reply"] = Relationship(
         back_populates="thread",
         sa_relationship_kwargs={"order_by": "Reply.created_at"},
     )
-
-
-class CommitRewrite(SQLModel, table=True):
-    """Records that ``old_sha`` was rewritten to ``new_sha`` (e.g. the AI
-    amended a commit during a rebase). Chains of these let GitLoco follow a
-    thread's original commit forward to whatever it has become."""
-
-    __tablename__ = "commit_rewrite"
-
-    id: int | None = Field(default=None, primary_key=True)
-    old_sha: str = Field(index=True)
-    new_sha: str = Field(index=True)
-    created_at: datetime = Field(default_factory=_now)
 
 
 class Reply(SQLModel, table=True):
@@ -81,38 +115,3 @@ class Reply(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_now)
 
     thread: Thread | None = Relationship(back_populates="replies")
-
-
-class CommitVersion(SQLModel, table=True):
-    """A point-in-time capture of a commit's file set, triggered by a human
-    action (thread creation or human reply). Versions are numbered sequentially
-    per ``commit_sha`` starting at 1.
-    """
-
-    __tablename__ = "commit_version"
-
-    id: int | None = Field(default=None, primary_key=True)
-    commit_sha: str = Field(index=True)
-    version_number: int  # 1, 2, 3, ... per commit_sha (V1, V2, ...)
-    created_at: datetime = Field(default_factory=_now)
-    trigger: str  # "thread_created" | "reply"
-    triggering_thread_id: int | None = Field(
-        default=None, foreign_key="thread.id", index=True
-    )
-    triggering_reply_id: int | None = Field(default=None, foreign_key="reply.id")
-
-
-class CommitVersionFile(SQLModel, table=True):
-    """One row per file in the commit's diff at the moment the version was
-    captured. Both diff sides are pointed at via deduped ``Snapshot`` rows."""
-
-    __tablename__ = "commit_version_file"
-
-    id: int | None = Field(default=None, primary_key=True)
-    version_id: int = Field(foreign_key="commit_version.id", index=True)
-    file_path: str  # canonical path key (new_path if present, else old_path)
-    status: str  # "added" | "modified" | "deleted" | "renamed" | "copied"
-    old_path: str | None = None
-    new_path: str | None = None
-    parent_snapshot_id: int | None = Field(default=None, foreign_key="snapshot.id")
-    commit_snapshot_id: int | None = Field(default=None, foreign_key="snapshot.id")

@@ -64,14 +64,12 @@ export interface NewThreadIn {
   body: string;
 }
 
-export type VersionTrigger = "thread_created" | "reply" | "rewrite";
-
 export interface CommitVersion {
   version_number: number;
+  commit_hash: string;
+  short_hash: string;
+  subject: string | null;
   created_at: string;
-  trigger: VersionTrigger;
-  triggering_thread_id: number | null;
-  triggering_reply_id: number | null;
 }
 
 export type CompareStatus =

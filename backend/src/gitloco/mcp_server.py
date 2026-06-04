@@ -8,45 +8,15 @@ from mcp.server.fastmcp import FastMCP
 from sqlalchemy import Engine
 from sqlmodel import Session, select
 
-from gitloco.attribution import reconcile_threads, record_rewrite
+from gitloco import persistence as pc
 from gitloco.diff import get_diff
 from gitloco.file_history import (
     iter_commits_touching,
     read_file_at,
     working_tree_patch_for,
 )
-from gitloco.models import CommitVersion, CommitVersionFile, Reply, Thread
+from gitloco.models import CommitVersionFile, Reply, Thread
 from gitloco.repo import WORKING_TREE_SHA, list_commits
-from gitloco.snapshots import snapshot_text as _snapshot_text_helper
-
-
-def _thread_dict(thread: Thread, *, engine: Engine) -> dict[str, Any]:
-    with Session(engine) as session:
-        thread_full = session.get(Thread, thread.id)
-        if thread_full is None:
-            return {}
-        replies = [
-            {
-                "id": r.id,
-                "author": r.author,
-                "body": r.body,
-                "created_at": r.created_at.isoformat(),
-            }
-            for r in thread_full.replies
-        ]
-        return {
-            "id": thread_full.id,
-            "commit_sha": thread_full.commit_sha,
-            "file_path": thread_full.file_path,
-            "line_side": thread_full.line_side,
-            "line_number": thread_full.line_number,
-            "status": thread_full.status,
-            "created_at": thread_full.created_at.isoformat(),
-            "resolved_at": thread_full.resolved_at.isoformat()
-            if thread_full.resolved_at
-            else None,
-            "replies": replies,
-        }
 
 
 def _commit_time(repo: pygit2.Repository, sha: str) -> datetime:
@@ -63,7 +33,7 @@ def _commit_time(repo: pygit2.Repository, sha: str) -> datetime:
 
 
 def _snapshot_text(session: Session, snapshot_id: int | None) -> str | None:
-    return _snapshot_text_helper(session, snapshot_id)
+    return pc.snapshot_text(session, snapshot_id)
 
 
 def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> FastMCP:
@@ -92,16 +62,21 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
         Always work through these in returned order.
         """
         with Session(engine) as session:
-            reconcile_threads(session, repo)
-            stmt = select(Thread).where(Thread.status == "open")
             if commit_sha:
-                stmt = stmt.where(Thread.commit_sha == commit_sha)
-            threads = list(session.exec(stmt).all())
-            threads.sort(key=lambda t: (_commit_time(repo, t.commit_sha), t.created_at))
-            return [
+                threads = [
+                    t
+                    for t in pc.threads_for_hash(session, repo, commit_sha)
+                    if t.status == "open"
+                ]
+            else:
+                threads = list(
+                    session.exec(select(Thread).where(Thread.status == "open")).all()
+                )
+            threads.sort(key=lambda t: (_commit_time(repo, t.commit_hash), t.created_at))
+            result = [
                 {
                     "id": t.id,
-                    "commit_sha": t.commit_sha,
+                    "commit_sha": t.commit_hash,
                     "file_path": t.file_path,
                     "line_side": t.line_side,
                     "line_number": t.line_number,
@@ -111,6 +86,8 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
                 }
                 for t in threads
             ]
+            session.commit()
+            return result
 
     @mcp.tool()
     def get_thread(thread_id: int) -> dict[str, Any]:
@@ -136,8 +113,8 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
             thread = session.get(Thread, thread_id)
             if thread is None:
                 raise ValueError(f"thread {thread_id} not found")
-            parent_text = _snapshot_text(session, thread.parent_snapshot_id)
-            commit_text = _snapshot_text(session, thread.commit_snapshot_id)
+            thread_file = thread.file_path
+            thread_hash = thread.commit_hash
             replies = [
                 {
                     "id": r.id,
@@ -147,41 +124,42 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
                 }
                 for r in thread.replies
             ]
-            # Use the *latest* commit version on this sha for all_files (most
-            # recent human-action snapshot). Versions before this one are
-            # available via list_commit_versions / get_commit_version.
-            latest_version = session.exec(
-                select(CommitVersion)
-                .where(CommitVersion.commit_sha == thread.commit_sha)
-                .order_by(CommitVersion.version_number.desc())  # type: ignore[union-attr]
-            ).first()
+            # Latest version of this logical commit → all_files + the primary
+            # file's content. Older versions are available via the version tools.
+            latest = pc.latest_version(session, thread.persistent_commit_id)
             all_files = []
             latest_version_number: int | None = None
-            if latest_version is not None:
-                latest_version_number = latest_version.version_number
+            parent_text = commit_text = None
+            if latest is not None:
+                latest_version_number = latest.version_number
                 file_rows = list(
                     session.exec(
                         select(CommitVersionFile)
-                        .where(CommitVersionFile.version_id == latest_version.id)
+                        .where(CommitVersionFile.version_id == latest.id)
                         .order_by(CommitVersionFile.file_path)
                     ).all()
                 )
-                all_files = [
-                    {
-                        "file_path": c.file_path,
-                        "status": c.status,
-                        "old_path": c.old_path,
-                        "new_path": c.new_path,
-                        "parent_content": _snapshot_text(session, c.parent_snapshot_id),
-                        "commit_content": _snapshot_text(session, c.commit_snapshot_id),
-                        "is_primary": c.file_path == thread.file_path,
-                    }
-                    for c in file_rows
-                ]
+                for c in file_rows:
+                    pcontent = _snapshot_text(session, c.parent_snapshot_id)
+                    ccontent = _snapshot_text(session, c.commit_snapshot_id)
+                    is_primary = c.file_path == thread_file
+                    all_files.append(
+                        {
+                            "file_path": c.file_path,
+                            "status": c.status,
+                            "old_path": c.old_path,
+                            "new_path": c.new_path,
+                            "parent_content": pcontent,
+                            "commit_content": ccontent,
+                            "is_primary": is_primary,
+                        }
+                    )
+                    if is_primary:
+                        parent_text, commit_text = pcontent, ccontent
             base_payload: dict[str, Any] = {
                 "id": thread.id,
-                "commit_sha": thread.commit_sha,
-                "file_path": thread.file_path,
+                "commit_sha": thread_hash,
+                "file_path": thread_file,
                 "line_side": thread.line_side,
                 "line_number": thread.line_number,
                 "status": thread.status,
@@ -195,12 +173,11 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
                 "all_files": all_files,
                 "latest_version_number": latest_version_number,
             }
+            session.commit()
 
         # history_since: only meaningful for real commits, not WORKING_TREE.
-        since_sha = (
-            thread.commit_sha if thread.commit_sha != WORKING_TREE_SHA else None
-        )
-        history = iter_commits_touching(repo, thread.file_path, since_sha=since_sha)
+        since_sha = thread_hash if thread_hash != WORKING_TREE_SHA else None
+        history = iter_commits_touching(repo, thread_file, since_sha=since_sha)
         base_payload["history_since"] = [
             {
                 "sha": c.sha,
@@ -216,9 +193,9 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
             for c in history
         ]
         base_payload["working_tree_patch"] = working_tree_patch_for(
-            repo, thread.file_path
+            repo, thread_file
         )
-        current = read_file_at(repo, WORKING_TREE_SHA, thread.file_path)
+        current = read_file_at(repo, WORKING_TREE_SHA, thread_file)
         if current.exists and not current.is_binary and current.content is not None:
             base_payload["current_content"] = current.content.decode(
                 "utf-8", errors="replace"
@@ -263,8 +240,9 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
                 on the rewritten commit, or read it from `git log`).
         """
         with Session(engine) as session:
-            migrated = record_rewrite(session, repo, old_sha, new_sha)
-        return {"old_sha": old_sha, "new_sha": new_sha, "migrated_threads": migrated}
+            added = pc.record_rewrite(session, repo, old_sha, new_sha)
+            session.commit()
+        return {"old_sha": old_sha, "new_sha": new_sha, "linked": added}
 
     @mcp.tool()
     def list_commits_tool() -> list[dict[str, Any]]:
@@ -283,44 +261,36 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
 
     @mcp.tool()
     def list_commit_versions(commit_sha: str) -> list[dict[str, Any]]:
-        """List every captured version (V1, V2, ...) of a commit, oldest first.
+        """List every version (V1, V2, …) of a commit, oldest first.
 
-        Each version was captured at a human action moment (thread creation or
-        human reply) and contains the full file set of the commit's diff vs
-        its parent at that point in time.
+        Each version is a distinct content state of the logical commit: the
+        original, plus each amend/rebase (recorded via record_commit_rewrite).
         """
         with Session(engine) as session:
-            rows = list(
-                session.exec(
-                    select(CommitVersion)
-                    .where(CommitVersion.commit_sha == commit_sha)
-                    .order_by(CommitVersion.version_number)
-                ).all()
-            )
-            return [
+            versions = pc.versions_for_hash(session, repo, commit_sha)
+            result = [
                 {
                     "version_number": v.version_number,
+                    "commit_hash": v.commit_hash,
+                    "subject": v.subject,
                     "created_at": v.created_at.isoformat(),
-                    "trigger": v.trigger,
-                    "triggering_thread_id": v.triggering_thread_id,
-                    "triggering_reply_id": v.triggering_reply_id,
                 }
-                for v in rows
+                for v in versions
             ]
+            session.commit()
+            return result
 
     @mcp.tool()
     def get_commit_version(
         commit_sha: str, version_number: int
     ) -> dict[str, Any]:
-        """Get a specific captured version of a commit, with all files (both
-        sides) as text."""
+        """Get a specific version of a commit, with all files (both sides) as
+        text."""
         with Session(engine) as session:
-            version = session.exec(
-                select(CommitVersion).where(
-                    CommitVersion.commit_sha == commit_sha,
-                    CommitVersion.version_number == version_number,
-                )
-            ).first()
+            versions = pc.versions_for_hash(session, repo, commit_sha)
+            version = next(
+                (v for v in versions if v.version_number == version_number), None
+            )
             if version is None:
                 raise ValueError(
                     f"commit {commit_sha} has no version {version_number}"
@@ -332,12 +302,10 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
                     .order_by(CommitVersionFile.file_path)
                 ).all()
             )
-            return {
+            result = {
                 "version_number": version.version_number,
+                "commit_hash": version.commit_hash,
                 "created_at": version.created_at.isoformat(),
-                "trigger": version.trigger,
-                "triggering_thread_id": version.triggering_thread_id,
-                "triggering_reply_id": version.triggering_reply_id,
                 "files": [
                     {
                         "file_path": f.file_path,
@@ -350,6 +318,8 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
                     for f in files
                 ],
             }
+            session.commit()
+            return result
 
     @mcp.tool()
     def get_file_history(
