@@ -4,6 +4,12 @@ from typing import Literal
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from sqlmodel import Session, select
 
+from gitloco.attribution import (
+    get_commit_identity,
+    orphaned_threads,
+    reconcile_threads,
+    record_rewrite,
+)
 from gitloco.compare import compare_versions
 from gitloco.models import (
     CommitVersion,
@@ -12,6 +18,7 @@ from gitloco.models import (
     Thread,
 )
 from gitloco.schemas import (
+    CommitRewriteIn,
     CommitVersionDetailOut,
     CommitVersionFileOut,
     CommitVersionListItemOut,
@@ -68,7 +75,11 @@ def list_threads(
     path: str | None = Query(None),
 ) -> list[ThreadOut]:
     engine = request.app.state.engine
+    repo = request.app.state.repo
     with Session(engine) as session:
+        # Re-attach any threads orphaned by a rebase before we filter by sha,
+        # so a thread shows up under the commit's current SHA.
+        reconcile_threads(session, repo)
         stmt = select(Thread)
         if status != "all":
             stmt = stmt.where(Thread.status == status)
@@ -79,6 +90,17 @@ def list_threads(
         stmt = stmt.order_by(Thread.created_at)
         threads = session.exec(stmt).all()
         return [_thread_out(t) for t in threads]
+
+
+@router.get("/orphans", response_model=list[ThreadOut])
+def list_orphan_threads(request: Request) -> list[ThreadOut]:
+    """Threads whose anchored commit is no longer reachable from HEAD and that
+    could not be auto-reattached (e.g. created before identity capture, or an
+    ambiguous identity match). Surfaced so the human can still resolve them."""
+    engine = request.app.state.engine
+    repo = request.app.state.repo
+    with Session(engine) as session:
+        return [_thread_out(t) for t in orphaned_threads(session, repo)]
 
 
 @router.post("", response_model=ThreadOut, status_code=201)
@@ -99,11 +121,13 @@ def create_thread(
     engine = request.app.state.engine
     repo = request.app.state.repo
     with Session(engine) as session:
+        identity = get_commit_identity(repo, payload.commit_sha) or {}
         thread = Thread(
             commit_sha=payload.commit_sha,
             file_path=payload.file_path,
             line_side=payload.line_side,
             line_number=payload.line_number,
+            **identity,
         )
         session.add(thread)
         session.flush()
@@ -200,6 +224,17 @@ def resolve_thread(
 # ---- Commit versions ---------------------------------------------------------
 
 commit_versions_router = APIRouter(prefix="/api/commits", tags=["commit-versions"])
+
+
+@commit_versions_router.post("/rewrites", status_code=200)
+def record_commit_rewrite(payload: CommitRewriteIn, request: Request) -> dict:
+    """Record that ``old_sha`` was rewritten to ``new_sha`` (e.g. an amend
+    during rebase) and re-attach affected threads. Returns how many migrated."""
+    engine = request.app.state.engine
+    repo = request.app.state.repo
+    with Session(engine) as session:
+        migrated = record_rewrite(session, repo, payload.old_sha, payload.new_sha)
+    return {"migrated_threads": migrated}
 
 
 @commit_versions_router.get(

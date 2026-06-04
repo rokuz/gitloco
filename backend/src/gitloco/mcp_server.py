@@ -8,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from sqlalchemy import Engine
 from sqlmodel import Session, select
 
+from gitloco.attribution import reconcile_threads, record_rewrite
 from gitloco.diff import get_diff
 from gitloco.file_history import (
     iter_commits_touching,
@@ -91,6 +92,7 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
         Always work through these in returned order.
         """
         with Session(engine) as session:
+            reconcile_threads(session, repo)
             stmt = select(Thread).where(Thread.status == "open")
             if commit_sha:
                 stmt = stmt.where(Thread.commit_sha == commit_sha)
@@ -245,6 +247,24 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
             session.commit()
             session.refresh(thread)
             return {"thread_id": thread.id, "reply_id": reply.id}
+
+    @mcp.tool()
+    def record_commit_rewrite(old_sha: str, new_sha: str) -> dict[str, Any]:
+        """Tell GitLoco that a commit was rewritten to a new SHA.
+
+        Call this **immediately after** you amend/rebase a commit (e.g. to fix
+        a thread), passing the original SHA and the new SHA it became. GitLoco
+        follows these mappings to keep comment threads attached to the commit
+        across the rebase, so the human can still find and resolve them.
+
+        Args:
+            old_sha: The commit's SHA before your rewrite.
+            new_sha: The commit's SHA after your rewrite (run `git rev-parse`
+                on the rewritten commit, or read it from `git log`).
+        """
+        with Session(engine) as session:
+            migrated = record_rewrite(session, repo, old_sha, new_sha)
+        return {"old_sha": old_sha, "new_sha": new_sha, "migrated_threads": migrated}
 
     @mcp.tool()
     def list_commits_tool() -> list[dict[str, Any]]:

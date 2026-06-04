@@ -30,9 +30,10 @@ Repeat until `list_open_threads` returns an empty array:
       - **Change.** If the comment is actionable, apply the fix **inside the original commit** (`commit_sha`) via interactive rebase:
         - `git rebase -i <commit_sha>^` (or `--root` for the initial commit), set the target commit to `edit`.
         - Edit the file(s) to address the comment.
-        - `git add` the changes, then `git commit --amend --no-edit`.
+        - `git add` the changes, then `git commit --amend --no-edit`. Note the commit's **new** SHA (e.g. `git rev-parse HEAD`) — you'll need it next.
         - `git rebase --continue` and resolve any conflicts that arise from later commits applying on top.
-        - After the rebase, call `reply_to_thread` with a short note: what you changed and which (new) SHA the fix lives in.
+        - **Record the rewrite so the thread stays attached:** call `record_commit_rewrite(old_sha, new_sha)` with the thread's original `commit_sha` and the SHA the commit became after your amend. Without this the thread can be orphaned on the old SHA and the human won't be able to resolve it. (GitLoco also auto-detects rewrites by commit identity, but recording it is exact — always do it.)
+        - Then call `reply_to_thread` with a short note: what you changed and which (new) SHA the fix lives in.
 
 3. **Do not call any "resolve" tool.** There isn't one. Humans review your replies and resolve threads themselves via the GitLoco UI.
 
@@ -49,6 +50,7 @@ Repeat until `list_open_threads` returns an empty array:
 - `list_open_threads(commit_sha?)` — get threads to work on, in order.
 - `get_thread(thread_id)` — full context including snapshots, history_since, working_tree_patch, current_content.
 - `reply_to_thread(thread_id, body)` — your way to talk back to the human.
+- `record_commit_rewrite(old_sha, new_sha)` — call right after you amend/rebase a commit so threads follow it to the new SHA.
 - `get_commit_diff(commit_sha)` — view a commit's diff if you need context.
 - `get_file_history(file_path, since_commit_sha?)` — every commit that touched a file, with patches.
 - `get_file_at(commit_sha, file_path)` — file content at any revision (use `"WORKING_TREE"` for the on-disk state).

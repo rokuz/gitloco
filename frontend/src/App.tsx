@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "./api/client";
 import { CommitDiff } from "./components/CommitDiff";
 import { CommitList } from "./components/CommitList";
+import { OrphanThreads } from "./components/OrphanThreads";
 import { applyTheme, initialTheme, type Theme } from "./utils/theme";
 
 function App() {
@@ -76,6 +77,7 @@ function App() {
         )}
 
         <main className="flex-1 overflow-y-auto p-3 md:p-6">
+          <OrphanThreads />
           {selectedSha ? (
             <div className="space-y-4">
               <h2 className="font-mono text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 break-all">

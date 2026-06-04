@@ -42,10 +42,33 @@ class Thread(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_now)
     resolved_at: datetime | None = None
 
+    # Identity of the anchored commit, captured at creation. These fields
+    # survive a rebase/amend (author identity + author time + subject are
+    # preserved even when the SHA changes), so an orphaned thread can be
+    # re-attached to the rewritten commit automatically. Null for the
+    # working-tree pseudo-commit and for threads created before this existed.
+    commit_subject: str | None = None
+    commit_author_name: str | None = None
+    commit_author_email: str | None = None
+    commit_author_time: int | None = None  # unix seconds
+
     replies: list["Reply"] = Relationship(
         back_populates="thread",
         sa_relationship_kwargs={"order_by": "Reply.created_at"},
     )
+
+
+class CommitRewrite(SQLModel, table=True):
+    """Records that ``old_sha`` was rewritten to ``new_sha`` (e.g. the AI
+    amended a commit during a rebase). Chains of these let GitLoco follow a
+    thread's original commit forward to whatever it has become."""
+
+    __tablename__ = "commit_rewrite"
+
+    id: int | None = Field(default=None, primary_key=True)
+    old_sha: str = Field(index=True)
+    new_sha: str = Field(index=True)
+    created_at: datetime = Field(default_factory=_now)
 
 
 class Reply(SQLModel, table=True):

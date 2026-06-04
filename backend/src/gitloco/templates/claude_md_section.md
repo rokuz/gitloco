@@ -17,8 +17,9 @@ or similar:
   `reply_to_thread` and move on.
 - If it's a code change, apply it **inside the original commit** via
   interactive rebase (`git rebase -i <commit>^`, set the target to `edit`,
-  amend, `git rebase --continue`), then `reply_to_thread` describing what
-  changed.
+  amend, `git rebase --continue`). Right after the amend, call
+  `record_commit_rewrite(old_sha, new_sha)` so the thread follows the commit
+  to its new SHA, then `reply_to_thread` describing what changed.
 - **Do not** call any resolve tool — there isn't one. Humans resolve
   threads in the UI.
 

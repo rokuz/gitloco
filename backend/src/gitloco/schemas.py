@@ -64,6 +64,11 @@ class NewReplyIn(BaseModel):
     body: str
 
 
+class CommitRewriteIn(BaseModel):
+    old_sha: str
+    new_sha: str
+
+
 class CommitVersionListItemOut(BaseModel):
     version_number: int
     created_at: datetime

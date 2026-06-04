@@ -43,6 +43,7 @@ export const api = {
     const query = qs.toString();
     return getJson<Thread[]>(`/api/threads${query ? `?${query}` : ""}`);
   },
+  orphanThreads: () => getJson<Thread[]>("/api/threads/orphans"),
   createThread: (input: NewThreadIn) => sendJson<Thread>("POST", "/api/threads", input),
   replyToThread: (threadId: number, body: string) =>
     sendJson<Thread>("POST", `/api/threads/${threadId}/replies`, { body }),
