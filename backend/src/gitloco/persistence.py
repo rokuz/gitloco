@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import difflib
 import hashlib
+import threading
 from pathlib import Path
 
 import pygit2
@@ -29,6 +30,14 @@ from gitloco.models import (
     Thread,
 )
 from gitloco.repo import WORKING_TREE_SHA
+
+# GitLoco runs as a single process per repo (the REST app and the in-process MCP
+# server share one threadpool). Creating a version is a check-then-insert, so two
+# concurrent requests for the same rewritten commit would otherwise each insert a
+# row. Serialize version creation through this process-wide lock; each holder also
+# starts from a fresh DB snapshot (session.rollback) so it sees rows other threads
+# just committed before deciding to insert.
+_version_lock = threading.RLock()
 
 _STATUS_MAP = {
     pygit2.GIT_DELTA_ADDED: "added",
@@ -291,35 +300,61 @@ def resolve_pc(
     Links the hash (as a new version) when it's an unseen rewrite of a known
     commit, or — when ``create`` — starts a fresh persistent commit. For the
     working tree, appends a version when the content changed since the last.
+
+    Any path that may create a version takes ``_version_lock`` and re-checks
+    from a fresh snapshot, so concurrent requests for the same hash can't each
+    insert a duplicate version (see the lock's note above).
     """
     existing = _version_by_hash(session, commit_hash)
     if existing is not None:
         pc_id = existing.persistent_commit_id
         if commit_hash == WORKING_TREE_SHA and create:
-            _maybe_capture_working_tree(session, repo, pc_id)
+            with _version_lock:
+                session.rollback()
+                _maybe_capture_working_tree(session, repo, pc_id)
+                session.commit()
         return pc_id
 
-    # An unseen real commit: maybe it's a rewrite of a known one.
-    if commit_hash != WORKING_TREE_SHA:
-        pc_id = _identity_match_pc(session, repo, commit_hash)
-        if pc_id is not None:
-            _add_version(session, repo, pc_id, commit_hash)
-            return pc_id
+    if commit_hash != WORKING_TREE_SHA or create:
+        with _version_lock:
+            # Fresh snapshot: another thread may have created this version
+            # between our first check and acquiring the lock.
+            session.rollback()
+            existing = _version_by_hash(session, commit_hash)
+            if existing is not None:
+                pc_id = existing.persistent_commit_id
+                if commit_hash == WORKING_TREE_SHA and create:
+                    _maybe_capture_working_tree(session, repo, pc_id)
+                    session.commit()
+                return pc_id
 
-    if not create:
-        return None
+            # An unseen real commit: maybe it's a rewrite of a known one.
+            if commit_hash != WORKING_TREE_SHA:
+                pc_id = _identity_match_pc(session, repo, commit_hash)
+                if pc_id is not None:
+                    _add_version(session, repo, pc_id, commit_hash)
+                    session.commit()
+                    return pc_id
 
-    pc = PersistentCommit()
-    session.add(pc)
-    session.flush()
-    _add_version(session, repo, pc.id, commit_hash)
-    return pc.id
+            if not create:
+                return None
+
+            pc = PersistentCommit()
+            session.add(pc)
+            session.flush()
+            _add_version(session, repo, pc.id, commit_hash)
+            session.commit()
+            return pc.id
+
+    return None
 
 
 def _maybe_capture_working_tree(
     session: Session, repo: pygit2.Repository, pc_id: int
 ) -> None:
-    """Capture a new working-tree version only if its content changed."""
+    """Capture a new working-tree version only if its content changed.
+
+    Callers hold ``_version_lock``; see resolve_pc."""
     latest = session.exec(
         select(CommitVersion)
         .where(
@@ -351,10 +386,13 @@ def record_rewrite(
     pc_id = resolve_pc(session, repo, old_hash, create=False)
     if pc_id is None:
         return False
-    if _version_by_hash(session, new_hash) is not None:
-        return False
-    _add_version(session, repo, pc_id, new_hash)
-    return True
+    with _version_lock:
+        session.rollback()  # fresh snapshot — see a concurrent auto-link
+        if _version_by_hash(session, new_hash) is not None:
+            return False
+        _add_version(session, repo, pc_id, new_hash)
+        session.commit()
+        return True
 
 
 # ── queries ──────────────────────────────────────────────────────────────────
