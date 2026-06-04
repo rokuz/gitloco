@@ -129,7 +129,3 @@ gitloco [PATH] [OPTIONS]
 - `get_commit_diff(commit_sha)` / `list_commits_tool()`
 
 There is intentionally no `resolve_thread` tool. Humans resolve via the UI.
-
-## Status
-
-v1 — usable end-to-end.
