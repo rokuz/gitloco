@@ -8,12 +8,16 @@ from importlib.resources import files
 from pathlib import Path
 
 import click
-import uvicorn
 
 from gitloco import __version__
-from gitloco.app import create_app
 from gitloco.config import Settings
 from gitloco.repo import NotAGitRepoError, open_repo
+
+# NOTE: `uvicorn` and `gitloco.app` (which pulls in fastapi, the mcp SDK,
+# sqlmodel, …) are imported lazily inside main(). Together they take ~0.5s+ to
+# import; doing it at module load would make `gitloco` sit silent before any
+# output, and a Ctrl-C during that window escapes Click's handler and dumps a
+# raw traceback. Deferring the import gives instant feedback and a clean abort.
 
 GITIGNORE_ENTRY = ".gitloco/\n"
 CLAUDE_COMMAND_RELPATH = Path(".claude/commands/gitloco.md")
@@ -204,6 +208,15 @@ def main(
             claude_md_target, action = _install_claude_md_section(repo_root)
             click.echo(f"{action.capitalize()} {claude_md_target} (GitLoco review section)")
         return
+    # Immediate feedback before the (slowish) heavy imports below, so the user
+    # never stares at a silent terminal and assumes it hung.
+    click.echo(f"Starting GitLoco {__version__}…")
+
+    # Lazy heavy imports — see note at top of module.
+    import uvicorn
+
+    from gitloco.app import create_app
+
     settings = Settings.for_repo(repo_root)
     _ensure_data_dir(settings.data_dir)
     _ensure_gitignore(repo_root)

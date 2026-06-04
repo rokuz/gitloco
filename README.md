@@ -16,6 +16,12 @@ Local code-review tool for AI-generated git changes. A human leaves comments on 
 - LAN-accessible — open the same URL from your phone on the couch.
 - Single-user local. No auth, no multi-tenancy.
 
+## Prerequisites
+
+- **[uv](https://docs.astral.sh/uv/)** — the Python package manager GitLoco is built and installed with. Install it with `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS/Linux) or `brew install uv`. uv manages the Python toolchain itself, so you don't need a separate Python install.
+- **Node.js 20+ / npm** — to build the frontend bundle (`./build.sh`).
+- **git** — GitLoco reviews git repositories.
+
 ## Install
 
 ```bash
