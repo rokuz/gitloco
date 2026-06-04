@@ -188,10 +188,17 @@ function ParsedFileBody({
   }, [parsedFile.hunks, language]);
 
   const widgets: Record<string, React.ReactNode> = {};
+  // Threads whose anchored line is no longer in this file's diff (e.g. a fix
+  // made the file shorter, so the line is past its current end). Render these
+  // after the diff so they're never lost.
+  const orphanedInFile: Thread[] = [];
 
   for (const t of threads) {
     const key = findChangeKey(parsedFile.hunks, t.line_side, t.line_number);
-    if (!key) continue;
+    if (!key) {
+      orphanedInFile.push(t);
+      continue;
+    }
     const existing = widgets[key];
     widgets[key] = (
       <>
@@ -222,23 +229,37 @@ function ParsedFileBody({
   }
 
   return (
-    <Diff
-      viewType="unified"
-      diffType={parsedFile.type as never}
-      hunks={parsedFile.hunks}
-      widgets={widgets}
-      tokens={tokens}
-      gutterEvents={{
-        onClick: ({ change }) => {
-          if (!change) return;
-          const target = changeToLine(change);
-          if (!target) return;
-          onOpenComposer(target.side, target.line);
-        },
-      }}
-    >
-      {(hunks) => hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)}
-    </Diff>
+    <>
+      <Diff
+        viewType="unified"
+        diffType={parsedFile.type as never}
+        hunks={parsedFile.hunks}
+        widgets={widgets}
+        tokens={tokens}
+        gutterEvents={{
+          onClick: ({ change }) => {
+            if (!change) return;
+            const target = changeToLine(change);
+            if (!target) return;
+            onOpenComposer(target.side, target.line);
+          },
+        }}
+      >
+        {(hunks) => hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)}
+      </Diff>
+      {orphanedInFile.length > 0 && (
+        <div className="px-3 py-2 space-y-2 border-t border-zinc-200 dark:border-zinc-800">
+          {orphanedInFile.map((t) => (
+            <div key={t.id}>
+              <div className="text-[11px] text-zinc-500 mb-1">
+                Anchored to line {t.line_number}, no longer in this file
+              </div>
+              <ThreadView thread={t} />
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
