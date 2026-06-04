@@ -73,6 +73,23 @@ export function CommitDiff({ sha }: Props) {
   });
 
   const [composer, setComposer] = useState<ComposerState | null>(null);
+  const [showLatestPrompt, setShowLatestPrompt] = useState(false);
+
+  // Comments anchor to the commit's current (latest) content, so they may only
+  // be left while viewing the latest version. When older versions are being
+  // compared, a gutter click prompts the user to switch to latest instead.
+  const latestNumber = versionsQuery.data?.length
+    ? Math.max(...versionsQuery.data.map((v) => v.version_number))
+    : 0;
+  const toNumber =
+    toName === "latest" ? latestNumber : parseInt(toName.replace(/^[vV]/, ""), 10);
+  const canComment = !hasVersions || toNumber === latestNumber;
+
+  const switchToLatest = () => {
+    setFromName("base");
+    setToName("latest");
+    setShowLatestPrompt(false);
+  };
 
   const isLoading =
     versionsQuery.isLoading ||
@@ -130,9 +147,13 @@ export function CommitDiff({ sha }: Props) {
                 commitSha={sha}
                 threads={fileThreads}
                 composer={fileComposer}
-                onOpenComposer={(side, line) =>
-                  setComposer({ filePath, side, line })
-                }
+                onOpenComposer={(side, line) => {
+                  if (!canComment) {
+                    setShowLatestPrompt(true);
+                    return;
+                  }
+                  setComposer({ filePath, side, line });
+                }}
                 onCloseComposer={() => setComposer(null)}
               />
             );
@@ -140,6 +161,42 @@ export function CommitDiff({ sha }: Props) {
         )}
       </div>
       <ThreadMinimap threads={openThreads} />
+
+      {showLatestPrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setShowLatestPrompt(false)}
+        >
+          <div
+            className="mx-4 max-w-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Comments go on the latest version
+            </h3>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+              You're viewing an older version. Switch to the latest version to
+              leave a comment.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowLatestPrompt(false)}
+                className="px-3 py-1.5 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={switchToLatest}
+                className="rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-50 dark:bg-zinc-700 dark:hover:bg-zinc-600 px-3 py-1.5 text-sm"
+              >
+                Switch to latest
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
