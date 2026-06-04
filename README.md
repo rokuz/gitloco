@@ -6,6 +6,14 @@ Local code-review tool for AI-generated git changes. A human leaves comments on 
 
 ![Inline comment thread — human ↔ AI back-and-forth right on the diff line](docs/img/03-inline-thread.png)
 
+## Why I built this
+
+I, like many others, work with AI to write code. And when the machine writes most of it, self-review matters as much as it ever has — maybe more. For me, how code *looks* matters: naming, shape, the small decisions on each line. I want fine-grained control over the lines an AI agent generates.
+
+The problem is the channel. I kept struggling to explain, in an AI agent's command line, how I want a piece of code to look and work — describing a line in prose is clumsy when I could just *point at it*. So I wanted a local tool that sits between me and the AI agent, with comment threads where I can say exactly what to do with any single line of generated code. The agent reads those comments, fixes the lines, and replies — right there on the diff.
+
+This is how GitLoco appeared. "Loco" comes from **local** — it runs entirely on your machine, just you and the agent. But I like the play on words too: *loco*motive. As Sheldon Cooper said, everyone loves trains. 🚂
+
 ## What it does
 
 - Runs as a one-process-per-repo local server (like `jupyter`, `storybook`).
