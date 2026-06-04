@@ -21,10 +21,12 @@ def _amend_head(repo_dir: Path, new_content: str) -> tuple[str, str]:
     # Preserve the original author signature (incl. time) — git does this on
     # amend/rebase; it's what identity matching relies on. Create detached
     # (reference_name=None) then move the branch ref, i.e. replace HEAD.
+    # Use an explicit committer (don't rely on global git config — absent in CI).
+    committer = pygit2.Signature("Rebaser", "rebase@e.com")
     new_id = repo.create_commit(
         None,
         head.author,  # same name/email/time
-        repo.default_signature,  # committer may differ
+        committer,  # committer may differ from author
         head.message,  # same message
         tree,
         [p.id for p in head.parents],
@@ -79,7 +81,7 @@ def test_explicit_record_commit_rewrite_reattaches(
     repo.index.add("hello.py")
     repo.index.write()
     new_id = repo.create_commit(
-        None, head.author, repo.default_signature,
+        None, head.author, pygit2.Signature("Rebaser", "rebase@e.com"),
         "Completely different subject", repo.index.write_tree(),
         [p.id for p in head.parents],
     )
