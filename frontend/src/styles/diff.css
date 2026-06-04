@@ -185,3 +185,9 @@ html.dark {
 .token.bold { font-weight: bold; }
 .token.italic { font-style: italic; }
 .token.entity { cursor: help; }
+
+/* Brief highlight when a thread is jumped to from the minimap. */
+.gitloco-flash {
+  box-shadow: 0 0 0 2px #f59e0b;
+  transition: box-shadow 0.2s ease;
+}

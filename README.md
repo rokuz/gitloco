@@ -33,14 +33,13 @@ This is how GitLoco appeared. "Loco" comes from **local** — it runs entirely o
 ## Install
 
 ```bash
-# Clone, build the bundled UI, then install the CLI globally.
+# Clone, then build + install the CLI in one step.
 git clone <repo> gitloco
 cd gitloco
-./build.sh                    # builds the frontend + bundles it into the backend package
-( cd backend && uv tool install . )
+./build.sh
 ```
 
-`build.sh` runs `npm install`/`npm run build` and copies the dist into `backend/src/gitloco/static/`. `uv tool install .` puts a `gitloco` binary on your `$PATH` (typically `~/.local/bin/gitloco`).
+`build.sh` builds the frontend, bundles it into the backend package, and runs `uv tool install .` — putting a `gitloco` binary on your `$PATH` (typically `~/.local/bin/gitloco`). It fails fast if `uv` isn't installed. Re-run it any time to rebuild and reinstall.
 
 ## Use
 

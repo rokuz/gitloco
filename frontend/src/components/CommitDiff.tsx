@@ -7,6 +7,7 @@ import type {
   LineSide,
 } from "../api/types";
 import { FileDiff } from "./FileDiff";
+import { ThreadMinimap } from "./ThreadMinimap";
 import { VersionPicker } from "./VersionPicker";
 
 interface Props {
@@ -90,45 +91,55 @@ export function CommitDiff({ sha }: Props) {
     : (liveDiffQuery.data?.files ?? []);
 
   const threads = threadsQuery.data ?? [];
+  const openThreads = threads
+    .filter((t) => t.status === "open")
+    .sort((a, b) =>
+      a.file_path === b.file_path
+        ? a.line_number - b.line_number
+        : a.file_path.localeCompare(b.file_path),
+    );
 
   return (
-    <div className="space-y-4">
-      {hasVersions && versionsQuery.data && (
-        <VersionPicker
-          versions={versionsQuery.data}
-          fromName={fromName}
-          toName={toName}
-          onChange={({ fromName, toName }) => {
-            setFromName(fromName);
-            setToName(toName);
-          }}
-        />
-      )}
-      {files.length === 0 ? (
-        <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">No changes.</div>
-      ) : (
-        files.map((f) => {
-          const filePath = f.new_path ?? f.old_path ?? "";
-          const fileThreads = threads.filter((t) => t.file_path === filePath);
-          const fileComposer =
-            composer && composer.filePath === filePath
-              ? { side: composer.side, line: composer.line }
-              : null;
-          return (
-            <FileDiff
-              key={filePath + "::" + f.status}
-              file={f}
-              commitSha={sha}
-              threads={fileThreads}
-              composer={fileComposer}
-              onOpenComposer={(side, line) =>
-                setComposer({ filePath, side, line })
-              }
-              onCloseComposer={() => setComposer(null)}
-            />
-          );
-        })
-      )}
+    <div className="flex gap-4">
+      <div className="flex-1 min-w-0 space-y-4">
+        {hasVersions && versionsQuery.data && (
+          <VersionPicker
+            versions={versionsQuery.data}
+            fromName={fromName}
+            toName={toName}
+            onChange={({ fromName, toName }) => {
+              setFromName(fromName);
+              setToName(toName);
+            }}
+          />
+        )}
+        {files.length === 0 ? (
+          <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">No changes.</div>
+        ) : (
+          files.map((f) => {
+            const filePath = f.new_path ?? f.old_path ?? "";
+            const fileThreads = threads.filter((t) => t.file_path === filePath);
+            const fileComposer =
+              composer && composer.filePath === filePath
+                ? { side: composer.side, line: composer.line }
+                : null;
+            return (
+              <FileDiff
+                key={filePath + "::" + f.status}
+                file={f}
+                commitSha={sha}
+                threads={fileThreads}
+                composer={fileComposer}
+                onOpenComposer={(side, line) =>
+                  setComposer({ filePath, side, line })
+                }
+                onCloseComposer={() => setComposer(null)}
+              />
+            );
+          })
+        )}
+      </div>
+      <ThreadMinimap threads={openThreads} />
     </div>
   );
 }

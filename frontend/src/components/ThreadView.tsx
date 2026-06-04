@@ -33,7 +33,10 @@ export function ThreadView({ thread }: Props) {
   const firstMessage = thread.replies[0]?.body ?? "";
 
   return (
-    <div className="my-2 rounded border border-zinc-300 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 text-sm">
+    <div
+      id={`gitloco-thread-${thread.id}`}
+      className="my-2 scroll-mt-4 rounded border border-zinc-300 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 text-sm"
+    >
       <button
         type="button"
         onClick={() => setCollapsed((v) => !v)}
