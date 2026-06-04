@@ -1,0 +1,76 @@
+name: Release
+
+# Publish a wheel (with the frontend bundled in) as a GitHub Release asset
+# whenever a vX.Y.Z tag is pushed.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build wheel and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Check tag matches package version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(cd backend && uv version --short)"
+          echo "tag=$tag  pyproject=$pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match backend version $pkg" >&2
+            exit 1
+          fi
+
+      - name: Build frontend
+        working-directory: frontend
+        # esbuild's postinstall can transiently hit ETXTBSY on overlay FS; retry.
+        run: |
+          for attempt in 1 2 3; do
+            if npm ci --no-fund --no-audit; then break; fi
+            echo "npm ci failed (attempt $attempt) — retrying…"; rm -rf node_modules; sleep 5
+          done
+          npm run build
+
+      - name: Bundle frontend into the backend package
+        run: |
+          rm -rf backend/src/gitloco/static
+          cp -r frontend/dist backend/src/gitloco/static
+
+      - name: Build wheel + sdist
+        working-directory: backend
+        run: uv build
+
+      - name: Verify the wheel bundled the UI
+        working-directory: backend
+        run: |
+          wheel="$(ls dist/*.whl)"
+          echo "Inspecting $wheel"
+          unzip -l "$wheel" | grep -q "gitloco/static/index.html" \
+            || { echo "::error::wheel is missing the bundled frontend" >&2; exit 1; }
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            backend/dist/*.whl backend/dist/*.tar.gz \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
