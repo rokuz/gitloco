@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Diff,
   Hunk,
@@ -94,53 +94,55 @@ export function FileDiff({
   onOpenComposer,
   onCloseComposer,
 }: Props) {
+  const [collapsed, setCollapsed] = useState(false);
   const displayPath =
     file.new_path && file.new_path !== "/dev/null"
       ? file.new_path
       : file.old_path ?? "(unknown)";
 
-  if (file.is_binary) {
-    return (
-      <section className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-        <FileHeader file={file} displayPath={displayPath} />
-        <div className="bg-white dark:bg-zinc-950 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
-          Binary file
-        </div>
-      </section>
-    );
-  }
-
-  const parsed = parseDiff(file.patch_text);
-  if (parsed.length === 0) {
-    return (
-      <section className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-        <FileHeader file={file} displayPath={displayPath} />
-        <div className="bg-white dark:bg-zinc-950 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
-          No textual changes.
-        </div>
-      </section>
-    );
-  }
-
   const language = detectLanguage(file.new_path ?? file.old_path);
   const filePath = file.new_path ?? file.old_path ?? "";
+  const parsed = file.is_binary ? [] : parseDiff(file.patch_text);
+
+  let body: React.ReactNode;
+  if (file.is_binary) {
+    body = (
+      <div className="bg-white dark:bg-zinc-950 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+        Binary file
+      </div>
+    );
+  } else if (parsed.length === 0) {
+    body = (
+      <div className="bg-white dark:bg-zinc-950 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+        No textual changes.
+      </div>
+    );
+  } else {
+    body = parsed.map((parsedFile, fIdx) => (
+      <ParsedFileBody
+        key={fIdx}
+        parsedFile={parsedFile}
+        language={language}
+        filePath={filePath}
+        commitSha={commitSha}
+        threads={threads}
+        composer={composer}
+        onOpenComposer={onOpenComposer}
+        onCloseComposer={onCloseComposer}
+      />
+    ));
+  }
 
   return (
     <section className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-      <FileHeader file={file} displayPath={displayPath} />
-      {parsed.map((parsedFile, fIdx) => (
-        <ParsedFileBody
-          key={fIdx}
-          parsedFile={parsedFile}
-          language={language}
-          filePath={filePath}
-          commitSha={commitSha}
-          threads={threads}
-          composer={composer}
-          onOpenComposer={onOpenComposer}
-          onCloseComposer={onCloseComposer}
-        />
-      ))}
+      <FileHeader
+        file={file}
+        displayPath={displayPath}
+        collapsed={collapsed}
+        threadCount={threads.length}
+        onToggle={() => setCollapsed((v) => !v)}
+      />
+      {!collapsed && body}
     </section>
   );
 }
@@ -243,25 +245,63 @@ function ParsedFileBody({
 function FileHeader({
   file,
   displayPath,
+  collapsed,
+  threadCount,
+  onToggle,
 }: {
   file: FileDiffData;
   displayPath: string;
+  collapsed: boolean;
+  threadCount: number;
+  onToggle: () => void;
 }) {
   const renamed =
     file.status === "renamed" && file.old_path && file.old_path !== file.new_path;
   return (
-    <header className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
-      <span
-        className={[
-          "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-          STATUS_COLOR[file.status],
-        ].join(" ")}
+    <header className="flex items-center bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        title={collapsed ? "Expand file" : "Collapse file"}
+        className="flex flex-1 items-center gap-2 px-3 py-2 min-w-0 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
       >
-        {STATUS_LABEL[file.status]}
-      </span>
-      <code className="font-mono text-xs text-zinc-800 dark:text-zinc-200 truncate">
-        {renamed ? `${file.old_path} → ${displayPath}` : displayPath}
-      </code>
+        <Chevron collapsed={collapsed} />
+        <span
+          className={[
+            "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+            STATUS_COLOR[file.status],
+          ].join(" ")}
+        >
+          {STATUS_LABEL[file.status]}
+        </span>
+        <code className="font-mono text-xs text-zinc-800 dark:text-zinc-200 truncate">
+          {renamed ? `${file.old_path} → ${displayPath}` : displayPath}
+        </code>
+        {collapsed && threadCount > 0 && (
+          <span className="ml-auto shrink-0 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 px-1.5 py-0.5 text-[10px] font-medium">
+            {threadCount} thread{threadCount > 1 ? "s" : ""}
+          </span>
+        )}
+      </button>
     </header>
+  );
+}
+
+function Chevron({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+      className={[
+        "shrink-0 text-zinc-500 transition-transform",
+        collapsed ? "-rotate-90" : "",
+      ].join(" ")}
+    >
+      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

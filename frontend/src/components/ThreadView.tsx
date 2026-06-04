@@ -27,11 +27,27 @@ export function ThreadView({ thread }: Props) {
   });
 
   const isResolved = thread.status === "resolved";
+  // Resolved threads start collapsed (they're done); open ones start expanded.
+  const [collapsed, setCollapsed] = useState(isResolved);
+
+  const firstMessage = thread.replies[0]?.body ?? "";
 
   return (
     <div className="my-2 rounded border border-zinc-300 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 text-sm">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-800 text-xs">
-        <span className="text-zinc-600 dark:text-zinc-400">
+      <button
+        type="button"
+        onClick={() => setCollapsed((v) => !v)}
+        aria-expanded={!collapsed}
+        title={collapsed ? "Expand thread" : "Collapse thread"}
+        className="flex w-full items-center gap-2 px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-800 text-xs text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+      >
+        <svg
+          width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden
+          className={["shrink-0 text-zinc-500 transition-transform", collapsed ? "-rotate-90" : ""].join(" ")}
+        >
+          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="shrink-0 text-zinc-600 dark:text-zinc-400">
           Thread #{thread.id} ·{" "}
           <span
             className={
@@ -43,7 +59,15 @@ export function ThreadView({ thread }: Props) {
             {isResolved ? "resolved" : "open"}
           </span>
         </span>
-      </div>
+        {collapsed && (
+          <span className="ml-2 truncate text-zinc-500 dark:text-zinc-500">
+            {firstMessage}
+            {thread.replies.length > 1 ? ` · ${thread.replies.length} messages` : ""}
+          </span>
+        )}
+      </button>
+      {!collapsed && (
+        <>
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
         {thread.replies.map((r) => (
           <ReplyRow key={r.id} reply={r} />
@@ -86,6 +110,8 @@ export function ThreadView({ thread }: Props) {
             </button>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
