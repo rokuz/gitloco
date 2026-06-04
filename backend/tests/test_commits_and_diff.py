@@ -5,6 +5,7 @@ def test_commits_endpoint_lists_commits_and_working_tree(client: TestClient):
     body = client.get("/api/commits").json()
     commits = body["commits"]
     assert body["has_working_tree_changes"] is True
+    assert body["branch"] == "main"
     # Working-tree pseudo-entry sits at the top.
     assert commits[0]["is_working_tree"] is True
     assert commits[0]["sha"] == "WORKING_TREE"

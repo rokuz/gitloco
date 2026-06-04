@@ -12,6 +12,7 @@ export interface Commit {
 export interface CommitList {
   commits: Commit[];
   has_working_tree_changes: boolean;
+  branch: string | null;
 }
 
 export const WORKING_TREE_SHA = "WORKING_TREE";

@@ -46,6 +46,22 @@ def has_working_tree_changes(repo: pygit2.Repository) -> bool:
     return any(flags != pygit2.GIT_STATUS_CURRENT for flags in status.values())
 
 
+def current_branch(repo: pygit2.Repository) -> str | None:
+    """The checked-out branch name, or None when detached / unresolvable.
+
+    Works even on an unborn HEAD (a fresh repo with no commits) by reading the
+    symbolic HEAD target."""
+    if repo.head_is_detached:
+        return None
+    if repo.head_is_unborn:
+        try:
+            target = repo.lookup_reference("HEAD").target  # e.g. "refs/heads/main"
+        except (KeyError, pygit2.GitError):
+            return None
+        return str(target).removeprefix("refs/heads/")
+    return repo.head.shorthand
+
+
 def _to_commit_info(commit: pygit2.Commit) -> CommitInfo:
     sha = str(commit.id)
     subject = commit.message.splitlines()[0] if commit.message else ""

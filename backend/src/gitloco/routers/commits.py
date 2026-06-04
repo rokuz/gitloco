@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from gitloco.diff import get_diff
 from gitloco.repo import (
     WORKING_TREE_SHA,
+    current_branch,
     has_working_tree_changes,
     list_commits,
 )
@@ -43,7 +44,11 @@ def get_commits(request: Request) -> CommitListOut:
                 is_working_tree=True,
             ),
         )
-    return CommitListOut(commits=commits, has_working_tree_changes=dirty)
+    return CommitListOut(
+        commits=commits,
+        has_working_tree_changes=dirty,
+        branch=current_branch(repo),
+    )
 
 
 @router.get("/commits/{sha}/diff", response_model=CommitDiffOut)

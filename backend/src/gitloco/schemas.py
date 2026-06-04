@@ -18,6 +18,7 @@ class CommitOut(BaseModel):
 class CommitListOut(BaseModel):
     commits: list[CommitOut]
     has_working_tree_changes: bool
+    branch: str | None = None
 
 
 class FileDiffOut(BaseModel):
