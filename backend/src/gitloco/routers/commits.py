@@ -25,6 +25,7 @@ def get_commits(request: Request) -> CommitListOut:
             author_email=c.author_email,
             committed_at=c.committed_at,
             subject=c.subject,
+            message=c.message,
             parent_shas=c.parent_shas,
         )
         for c in list_commits(repo)
@@ -40,6 +41,7 @@ def get_commits(request: Request) -> CommitListOut:
                 author_email="",
                 committed_at=datetime.now(UTC),
                 subject="Uncommitted changes",
+                message="Uncommitted changes",
                 parent_shas=[],
                 is_working_tree=True,
             ),

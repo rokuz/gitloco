@@ -5,6 +5,7 @@ export interface Commit {
   author_email: string;
   committed_at: string;
   subject: string;
+  message: string;
   parent_shas: string[];
   is_working_tree: boolean;
 }

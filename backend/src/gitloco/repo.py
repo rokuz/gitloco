@@ -17,6 +17,7 @@ class CommitInfo:
     author_email: str
     committed_at: datetime
     subject: str
+    message: str  # full commit message (subject + body)
     parent_shas: list[str]
 
 
@@ -64,7 +65,8 @@ def current_branch(repo: pygit2.Repository) -> str | None:
 
 def _to_commit_info(commit: pygit2.Commit) -> CommitInfo:
     sha = str(commit.id)
-    subject = commit.message.splitlines()[0] if commit.message else ""
+    message = (commit.message or "").strip()
+    subject = message.splitlines()[0] if message else ""
     committed_at = datetime.fromtimestamp(commit.commit_time, tz=UTC)
     return CommitInfo(
         sha=sha,
@@ -73,5 +75,6 @@ def _to_commit_info(commit: pygit2.Commit) -> CommitInfo:
         author_email=commit.author.email,
         committed_at=committed_at,
         subject=subject,
+        message=message,
         parent_shas=[str(p) for p in commit.parent_ids],
     )

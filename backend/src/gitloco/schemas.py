@@ -11,6 +11,7 @@ class CommitOut(BaseModel):
     author_email: str
     committed_at: datetime
     subject: str
+    message: str = ""
     parent_shas: list[str]
     is_working_tree: bool = False
 

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { api } from "../api/client";
 import type { Commit } from "../api/types";
 
@@ -63,11 +64,28 @@ function CommitRow({
   openCount: number;
   onClick: () => void;
 }) {
+  const [popover, setPopover] = useState<{ top: number; left: number } | null>(null);
+
+  // Show the full commit message popover only when the panel actually clips it
+  // (multi-line body, or a subject too long for the row).
+  const hasMore =
+    !commit.is_working_tree &&
+    commit.message.trim().length > 0 &&
+    (commit.message.includes("\n") || commit.subject.length > 32);
+
+  const showPopover = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!hasMore) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setPopover({ top: r.top, left: r.right + 8 });
+  };
+
   return (
     <li>
       <button
         type="button"
         onClick={onClick}
+        onMouseEnter={showPopover}
+        onMouseLeave={() => setPopover(null)}
         className={[
           "w-full text-left px-3 py-3 md:py-2 transition-colors",
           selected
@@ -109,6 +127,19 @@ function CommitRow({
             : `${commit.author_name} · ${relativeTime(commit.committed_at)}`}
         </div>
       </button>
+      {popover && (
+        <div
+          className="fixed z-50 w-96 max-w-[80vw] max-h-[60vh] overflow-auto rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 shadow-xl pointer-events-none"
+          style={{ top: popover.top, left: popover.left }}
+        >
+          <div className="font-mono text-[11px] text-zinc-500 mb-1">
+            {commit.short_sha} · {commit.author_name}
+          </div>
+          <pre className="whitespace-pre-wrap break-words font-mono text-xs text-zinc-800 dark:text-zinc-100 m-0">
+            {commit.message}
+          </pre>
+        </div>
+      )}
     </li>
   );
 }
