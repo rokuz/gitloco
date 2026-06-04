@@ -16,7 +16,6 @@ async function selectCommitBySubject(page, substr) {
 
 const browser = await chromium.launch({ executablePath: CHROME });
 try {
-  // Desktop ---------------------------------------------------------------
   const desktop = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 2,
@@ -26,37 +25,31 @@ try {
   await page.waitForSelector("aside button");
   await page.waitForTimeout(600);
 
-  // 1. Overview
   await snap(page, "01-overview.png");
 
-  // Select the Frontend commit (seeded threads + 2 versions)
   await selectCommitBySubject(page, "Frontend:");
 
-  // 2. Diff + syntax highlighting — VersionPicker.tsx top
   await page
     .locator("section header code", { hasText: "VersionPicker.tsx" })
     .first()
     .scrollIntoViewIfNeeded();
+  const main = await page.$("main");
+  await main.evaluate((el) => el.scrollBy({ top: 60 }));
   await page.waitForTimeout(500);
   await snap(page, "02-diff-syntax-highlight.png");
 
-  // 3. Inline thread — scroll to the "Thread #1" badge in the diff
   const threadHeader = page.locator("text=Thread #1").first();
   await threadHeader.scrollIntoViewIfNeeded();
-  // Shift up so the diff lines above the thread are visible too
-  const main = await page.$("main");
-  await main.evaluate((el) => el.scrollBy({ top: -180 }));
+  await main.evaluate((el) => el.scrollBy({ top: -160 }));
   await page.waitForTimeout(400);
   await snap(page, "03-inline-thread.png");
 
-  // 4. Compare picker — scroll the main pane to the top
   await main.evaluate((el) => el.scrollTo({ top: 0 }));
   await page.waitForTimeout(400);
   await snap(page, "04-version-compare.png");
 
   await desktop.close();
 
-  // Mobile ----------------------------------------------------------------
   const mobile = await browser.newContext({
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
@@ -69,9 +62,6 @@ try {
   await m.locator('button[aria-label="Open commit list"]').click();
   await m.waitForTimeout(600);
   await snap(m, "05-mobile-drawer.png");
-  await m.locator('button:has-text("Frontend:")').first().click();
-  await m.waitForTimeout(900);
-  await snap(m, "06-mobile-diff.png");
   await mobile.close();
 } finally {
   await browser.close();

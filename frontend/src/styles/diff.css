@@ -59,20 +59,20 @@
   cursor: pointer;
 }
 
-/* Prism/refractor token colors — dark theme */
+/* Prism/refractor token colors — dark theme, high contrast */
 .token.comment,
 .token.prolog,
 .token.doctype,
-.token.cdata { color: #6a737d; font-style: italic; }
+.token.cdata { color: #8b949e; font-style: italic; }
 .token.punctuation { color: #c9d1d9; }
-.token.namespace { opacity: 0.7; }
+.token.namespace { opacity: 0.85; }
 .token.property,
 .token.tag,
 .token.boolean,
 .token.number,
 .token.constant,
 .token.symbol,
-.token.deleted { color: #f0883e; }
+.token.deleted { color: #ffa657; }
 .token.selector,
 .token.attr-name,
 .token.string,
@@ -86,9 +86,11 @@
 .style .token.string { color: #ff7b72; }
 .token.atrule,
 .token.attr-value,
-.token.keyword { color: #ff7b72; }
+.token.keyword { color: #ff7b72; font-weight: 600; }
 .token.function,
-.token.class-name { color: #d2a8ff; }
+.token.function-variable { color: #d2a8ff; }
+.token.class-name,
+.token.generic.class-name { color: #ffa657; }
 .token.regex,
 .token.important,
 .token.variable { color: #ffa657; }
@@ -96,3 +98,5 @@
 .token.bold { font-weight: bold; }
 .token.italic { font-style: italic; }
 .token.entity { cursor: help; }
+/* Make sure the diff cells let token colors win over inherited light gray */
+.diff-code .token { color: inherit; }

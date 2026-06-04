@@ -11,6 +11,24 @@ import {
 } from "react-diff-view";
 import type { ChangeData, HunkData, HunkTokens } from "react-diff-view";
 import { refractor } from "refractor";
+import tsxLang from "refractor/tsx";
+import jsxLang from "refractor/jsx";
+
+// Register languages the common bundle doesn't ship.
+refractor.register(tsxLang);
+refractor.register(jsxLang);
+
+// react-diff-view 3.x expects refractor's old highlight shape (array of HAST
+// nodes), but refractor v5 wraps them in a Root node. Adapt by peeling off
+// the root.
+const refractorAdapter = {
+  highlight(text: string, language: string): unknown[] {
+    const root = refractor.highlight(text, language) as {
+      children?: unknown[];
+    };
+    return root?.children ?? [];
+  },
+};
 import type { FileDiff as FileDiffData, LineSide, Thread } from "../api/types";
 import { detectLanguage } from "../utils/language";
 import { NewThreadComposer } from "./NewThreadComposer";
@@ -149,11 +167,16 @@ function ParsedFileBody({
     try {
       return tokenize(parsedFile.hunks, {
         highlight: true,
-        // refractor's actual shape matches the structural type the lib expects.
-        refractor: refractor as unknown as { highlight: (...args: unknown[]) => unknown },
+        refractor: refractorAdapter as Parameters<
+          typeof tokenize
+        >[1] extends { refractor: infer R }
+          ? R
+          : never,
         language,
       } as Parameters<typeof tokenize>[1]);
-    } catch {
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("tokenize failed for", language, e);
       return undefined;
     }
   }, [parsedFile.hunks, language]);
