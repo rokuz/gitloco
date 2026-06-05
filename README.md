@@ -113,6 +113,8 @@ Server options:
                           disable LAN access)
   --port INT              Port (default 7777)
   --no-browser            Do not open a browser on launch
+  --verbose, -v           Log every request to the server log (default: only
+                          errors, to keep .gitloco/server.log small)
   --install-command       Write .claude/commands/gitloco.md and exit
   --install-mcp           Write/update .mcp.json so Claude Code discovers
                           the local GitLoco MCP server (implies

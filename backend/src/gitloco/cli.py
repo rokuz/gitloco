@@ -1,4 +1,5 @@
 import json
+import logging
 import socket
 import sys
 import threading
@@ -68,10 +69,31 @@ def _ensure_data_dir(data_dir: Path) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
 
 
-def _file_log_config(log_file: Path) -> dict:
+class _ErrorAccessFilter(logging.Filter):
+    """Drop access-log records for successful (status < 400) responses, so the
+    log isn't flooded by the UI's 5s polling. Errors still get through."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # uvicorn.access logs with args
+        # (client_addr, method, path, http_version, status_code).
+        try:
+            return int(record.args[4]) >= 400  # type: ignore[index]
+        except (TypeError, IndexError, ValueError):
+            return True
+
+
+def _file_log_config(log_file: Path, *, verbose: bool) -> dict:
     """uvicorn logging config that writes the server + access logs to a file
-    instead of the console, so the terminal stays clean (just our own echoes)."""
-    return {
+    instead of the console, so the terminal stays clean (just our own echoes).
+
+    By default successful requests are filtered out of the access log; pass
+    ``verbose=True`` to log every request."""
+    access_handler: dict = {
+        "class": "logging.FileHandler",
+        "filename": str(log_file),
+        "formatter": "access",
+    }
+    config: dict = {
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
@@ -93,11 +115,7 @@ def _file_log_config(log_file: Path) -> dict:
                 "filename": str(log_file),
                 "formatter": "default",
             },
-            "access": {
-                "class": "logging.FileHandler",
-                "filename": str(log_file),
-                "formatter": "access",
-            },
+            "access": access_handler,
         },
         "loggers": {
             "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
@@ -109,6 +127,10 @@ def _file_log_config(log_file: Path) -> dict:
             },
         },
     }
+    if not verbose:
+        config["filters"] = {"errors_only": {"()": _ErrorAccessFilter}}
+        access_handler["filters"] = ["errors_only"]
+    return config
 
 
 def _ensure_gitignore(repo_root: Path) -> None:
@@ -312,6 +334,13 @@ def _open_repo_root(path: Path) -> tuple[object, Path]:
     is_flag=True,
     help="Overwrite an existing slash-command file (used with --install-command).",
 )
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Log every request to the server log, including successful ones "
+    "(by default only errors are logged, to keep the log small).",
+)
 def serve(
     path: Path,
     host: str,
@@ -320,6 +349,7 @@ def serve(
     install_command: bool,
     install_mcp: bool,
     force: bool,
+    verbose: bool,
 ) -> None:
     """Launch GitLoco for a local git repository (the default command)."""
     _set_process_title()
@@ -392,7 +422,7 @@ def serve(
         app,
         host=host,
         port=chosen_port,
-        log_config=_file_log_config(log_file),
+        log_config=_file_log_config(log_file, verbose=verbose),
     )
 
 
