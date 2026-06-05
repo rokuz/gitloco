@@ -6,6 +6,8 @@ description: Address open GitLoco threads (oldest commit first), fixing each in 
 
 GitLoco is the local code-review tool running alongside this repo. The human has left review comments on specific lines of specific commits. Your job is to work through every open thread in **chronological commit order** (oldest first) and address each one before moving to the next.
 
+**Reply style — lean and direct.** Every `reply_to_thread` is one or two sentences. No preamble, no pleasantries, no restating the comment, no summarizing context the human can already see, no SHAs (GitLoco tracks those itself). Just state what you changed or ask the single question you need answered. Think terse commit message, not essay.
+
 ## Loop
 
 Repeat until `list_open_threads` returns an empty array:
@@ -26,14 +28,14 @@ Repeat until `list_open_threads` returns an empty array:
    b. **Check whether the comment still applies.** The repo may have changed since the comment was written (especially after you've rebased earlier commits). Compare the snapshot contents to the current state of `file_path`. If the issue no longer exists, call `reply_to_thread` explaining that and move on.
 
    c. **Decide: clarification or change?**
-      - **Clarification.** If you don't have enough information to act, post a focused, single-question reply via `reply_to_thread`. Stop the loop for this thread — the human will reply later and `/gitloco` will be re-run.
+      - **Clarification.** If you don't have enough information to act, post a single-question reply via `reply_to_thread` (one sentence — just the question). Stop the loop for this thread — the human will reply later and `/gitloco` will be re-run.
       - **Change.** If the comment is actionable, apply the fix **inside the original commit** (`commit_sha`) via interactive rebase:
         - `git rebase -i <commit_sha>^` (or `--root` for the initial commit), set the target commit to `edit`.
         - Edit the file(s) to address the comment.
         - `git add` the changes, then `git commit --amend --no-edit`. Note the commit's **new** SHA (e.g. `git rev-parse HEAD`) — you'll need it next.
         - `git rebase --continue` and resolve any conflicts that arise from later commits applying on top.
         - **Record the rewrite so the thread stays attached:** call `record_commit_rewrite(old_sha, new_sha)` with the thread's original `commit_sha` and the SHA the commit became after your amend. Without this the thread can be orphaned on the old SHA and the human won't be able to resolve it. (GitLoco also auto-detects rewrites by commit identity, but recording it is exact — always do it.)
-        - Then call `reply_to_thread` with a short note: what you changed and which (new) SHA the fix lives in.
+        - Then call `reply_to_thread` with one lean line: what you changed. No preamble, no recap, no SHA (GitLoco follows the rewrite via `record_commit_rewrite`).
 
 3. **Do not call any "resolve" tool.** There isn't one. Humans review your replies and resolve threads themselves via the GitLoco UI.
 

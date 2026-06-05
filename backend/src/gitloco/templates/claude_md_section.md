@@ -20,6 +20,9 @@ or similar:
   amend, `git rebase --continue`). Right after the amend, call
   `record_commit_rewrite(old_sha, new_sha)` so the thread follows the commit
   to its new SHA, then `reply_to_thread` describing what changed.
+- **Keep replies lean.** One or two sentences — no preamble, no pleasantries,
+  no restating the comment, no SHAs. Just what you changed or the single
+  question you need answered.
 - **Do not** call any resolve tool — there isn't one. Humans resolve
   threads in the UI.
 

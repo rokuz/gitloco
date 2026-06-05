@@ -44,7 +44,9 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
             f"GitLoco — local code review for repo {repo_path}. "
             "Use list_open_threads to find work, get_thread for full context, "
             "and reply_to_thread to respond. Address threads in the order they are returned "
-            "(oldest commit first). Humans resolve threads; you do not."
+            "(oldest commit first). Keep replies lean: one or two sentences, no preamble "
+            "or pleasantries, no restating the comment, no SHAs — just what you changed or "
+            "the single question. Humans resolve threads; you do not."
         ),
         # We mount the resulting Starlette app under /mcp in our FastAPI app,
         # so the inner endpoint must be at "/" or the URL doubles up.
@@ -210,6 +212,10 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
 
         Use this to (a) ask the human a clarifying question, or (b) describe
         the fix you applied to the original commit via rebase.
+
+        Keep it lean: one or two sentences, no preamble or pleasantries. Don't
+        restate the comment, re-summarize context the human already has, or
+        quote SHAs — just state what changed, or ask the single question.
         """
         if not body.strip():
             raise ValueError("body must not be empty")
