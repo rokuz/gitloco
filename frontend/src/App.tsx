@@ -1,20 +1,36 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "./api/client";
 import { CommitDiff } from "./components/CommitDiff";
 import { CommitList } from "./components/CommitList";
 import { OrphanThreads } from "./components/OrphanThreads";
 import { applyTheme, initialTheme, type Theme } from "./utils/theme";
+import { useScrollRestoration } from "./utils/useScrollRestoration";
 
 function App() {
-  const [selectedSha, setSelectedSha] = useState<string | null>(null);
+  // Restore the opened commit from the URL so a refresh keeps it (and the URL
+  // is shareable). Kept in sync below.
+  const [selectedSha, setSelectedSha] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get("commit"),
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => initialTheme());
   const { data: health } = useQuery({ queryKey: ["health"], queryFn: api.health });
 
+  const mainRef = useRef<HTMLElement>(null);
+  useScrollRestoration(mainRef, selectedSha);
+
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  // Mirror the selected commit into the URL (?commit=…) for refresh/sharing.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (selectedSha) url.searchParams.set("commit", selectedSha);
+    else url.searchParams.delete("commit");
+    window.history.replaceState(null, "", url);
+  }, [selectedSha]);
 
   // Close drawer when selecting on mobile, after the selection has rendered.
   useEffect(() => {
@@ -76,7 +92,7 @@ function App() {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto p-3 md:p-6">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-3 md:p-6">
           <OrphanThreads />
           {selectedSha ? (
             <div className="space-y-4">
