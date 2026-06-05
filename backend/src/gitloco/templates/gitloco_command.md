@@ -43,6 +43,7 @@ Repeat until `list_open_threads` returns an empty array:
 
 ## Special cases
 
+- **Rollback requests.** If the human asks to roll a commit back to an earlier version (e.g. "revert this to V1"), call `list_commit_versions(commit_sha)` to see the versions, then `get_version_files(commit_sha, N)` for the target. Write each returned file's `content` to its `file_path` (delete files whose `present` is false), then amend the commit (rebase as above), `record_commit_rewrite`, and reply.
 - **WORKING_TREE threads.** The `commit_sha` is the literal string `WORKING_TREE`. Don't rebase — these are uncommitted changes. Edit the file in the working tree directly (or unstage / re-stage as needed) and reply describing what changed.
 - **Stacked edits in one commit.** If multiple threads target the same commit, address them all in a single `git rebase` session before continuing — one rebase per commit, not per thread.
 - **Conflicts during rebase.** Resolve them and keep going. If a conflict is genuinely ambiguous, do not guess — post a `reply_to_thread` asking the human, abort the rebase (`git rebase --abort`), and move to the next thread.
@@ -53,6 +54,8 @@ Repeat until `list_open_threads` returns an empty array:
 - `get_thread(thread_id)` — full context including snapshots, history_since, working_tree_patch, current_content.
 - `reply_to_thread(thread_id, body)` — your way to talk back to the human.
 - `record_commit_rewrite(old_sha, new_sha)` — call right after you amend/rebase a commit so threads follow it to the new SHA.
+- `list_commit_versions(commit_sha)` — every version (V1, V2, …) of a commit, oldest first.
+- `get_version_files(commit_sha, version_number)` — writable file contents of a version, for rolling a commit back to it.
 - `get_commit_diff(commit_sha)` — view a commit's diff if you need context.
 - `get_file_history(file_path, since_commit_sha?)` — every commit that touched a file, with patches.
 - `get_file_at(commit_sha, file_path)` — file content at any revision (use `"WORKING_TREE"` for the on-disk state).

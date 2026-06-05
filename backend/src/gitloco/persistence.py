@@ -522,6 +522,45 @@ def latest_version(session: Session, pc_id: int) -> CommitVersion | None:
     ).first()
 
 
+def version_file_contents(
+    session: Session,
+    repo: pygit2.Repository,
+    commit_hash: str,
+    version_number: int,
+) -> dict | None:
+    """The writable file contents of one version of a commit — for rolling the
+    commit's content back to that version.
+
+    For each file, ``content`` is its full text on the commit side of that
+    version; ``present`` is False (content null) when the file did not exist
+    there, meaning it should be removed on rollback. Returns None if the commit
+    has no such version."""
+    versions = versions_for_hash(session, repo, commit_hash)
+    version = next(
+        (v for v in versions if v.version_number == version_number), None
+    )
+    if version is None:
+        return None
+    files = _version_files(session, version)
+    out = []
+    for path in sorted(files):
+        content, _p, is_binary = _side_text(session, files[path], "commit")
+        out.append(
+            {
+                "file_path": path,
+                "status": files[path].status,
+                "is_binary": is_binary,
+                "present": files[path].commit_snapshot_id is not None,
+                "content": content,
+            }
+        )
+    return {
+        "version_number": version.version_number,
+        "commit_hash": version.commit_hash,
+        "files": out,
+    }
+
+
 # ── compare ──────────────────────────────────────────────────────────────────
 
 

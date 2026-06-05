@@ -1,6 +1,6 @@
 [project]
 name = "gitloco"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local code-review tool for AI-generated git changes"
 authors = [
     { name = "rokuz", email = "5437220+rokuz@users.noreply.github.com" }

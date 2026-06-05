@@ -20,6 +20,9 @@ or similar:
   amend, `git rebase --continue`). Right after the amend, call
   `record_commit_rewrite(old_sha, new_sha)` so the thread follows the commit
   to its new SHA, then `reply_to_thread` describing what changed.
+- To **roll a commit back to an earlier version** (e.g. "revert this to V1"),
+  call `get_version_files(commit_sha, N)`, write each file's `content` back,
+  then amend + `record_commit_rewrite`.
 - **Keep replies lean.** One or two sentences — no preamble, no pleasantries,
   no restating the comment, no SHAs. Just what you changed or the single
   question you need answered.

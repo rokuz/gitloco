@@ -105,8 +105,10 @@ The sidebar becomes a slide-over drawer below the `md` breakpoint, so the same U
 ## CLI
 
 ```
-gitloco [PATH] [OPTIONS]
+gitloco [PATH] [OPTIONS]      # start the review server (the default command)
+gitloco doctor [PATH]         # check & repair .gitloco/comments.db, then exit
 
+Server options:
   --host TEXT             Bind address (default 0.0.0.0; use 127.0.0.1 to
                           disable LAN access)
   --port INT              Port (default 7777)
@@ -118,12 +120,17 @@ gitloco [PATH] [OPTIONS]
   --force                 Overwrite an existing slash-command file
 ```
 
+`gitloco doctor` fixes everything it safely can — collapses duplicate commit
+versions, re-links rebased threads to their commit, and runs a SQLite
+integrity check + vacuum. It's idempotent: a no-op on a healthy database.
+
 ## MCP tools exposed to the agent
 
 - `list_open_threads(commit_sha?)` — threads to address, ordered oldest commit first
 - `get_thread(thread_id)` — full context: replies, primary file snapshots, `all_files` for the whole commit, `history_since`, `working_tree_patch`, `current_content`, `latest_version_number`
 - `reply_to_thread(thread_id, body)`
 - `list_commit_versions(commit_sha)` / `get_commit_version(commit_sha, n)`
+- `get_version_files(commit_sha, n)` — writable file contents of a version, for rolling a commit back to it
 - `get_file_history(file_path, since_commit_sha?)` / `get_file_at(commit_sha, file_path)`
 - `get_commit_diff(commit_sha)` / `list_commits_tool()`
 

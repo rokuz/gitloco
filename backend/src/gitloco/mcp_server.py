@@ -328,6 +328,36 @@ def build_mcp(*, engine: Engine, repo: pygit2.Repository, repo_path: str) -> Fas
             return result
 
     @mcp.tool()
+    def get_version_files(
+        commit_sha: str, version_number: int
+    ) -> dict[str, Any]:
+        """Get the writable file contents of a specific version of a commit, for
+        rolling its content back to that version (e.g. the human asks "roll this
+        back to V1").
+
+        Each file's `content` is its full text as of that version's commit side.
+        To roll back: write each `content` to its `file_path` (delete files
+        whose `present` is false), then amend the commit (rebase) and call
+        record_commit_rewrite. Binary files have `is_binary: true` and null
+        content — restore those from git directly.
+
+        Args:
+            commit_sha: Any SHA the commit currently has (any of its versions).
+            version_number: Target version (1 = original; see
+                list_commit_versions).
+        """
+        with Session(engine) as session:
+            data = pc.version_file_contents(
+                session, repo, commit_sha, version_number
+            )
+            session.commit()
+        if data is None:
+            raise ValueError(
+                f"commit {commit_sha} has no version {version_number}"
+            )
+        return data
+
+    @mcp.tool()
     def get_file_history(
         file_path: str, since_commit_sha: str | None = None
     ) -> dict[str, Any]:

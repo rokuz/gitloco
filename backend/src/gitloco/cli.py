@@ -238,7 +238,48 @@ def _sync_mcp_port(repo_root: Path, *, port: int) -> bool:
     return True
 
 
-@click.command()
+class _DefaultGroup(click.Group):
+    """A group that runs its ``default`` command for bare invocation or when the
+    first token isn't a known subcommand — so ``gitloco [PATH] [opts]`` still
+    serves while ``gitloco doctor`` dispatches to the subcommand."""
+
+    def __init__(self, *args: object, default: str | None = None, **kwargs: object):
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self._default = default
+
+    def parse_args(self, ctx, args):  # type: ignore[override]
+        if self._default and not self._names_command(args):
+            args = [self._default, *args]
+        return super().parse_args(ctx, args)
+
+    def _names_command(self, args: list[str]) -> bool:
+        if args and args[0] in ("--help", "-h", "--version"):
+            return True  # let the group handle these itself
+        first = next((a for a in args if not a.startswith("-")), None)
+        return first in self.commands
+
+
+@click.group(cls=_DefaultGroup, default="serve")
+@click.version_option(__version__, prog_name="gitloco")
+def main() -> None:
+    """GitLoco — local code review for AI-generated git changes.
+
+    Run `gitloco [PATH]` to start the review server, or `gitloco doctor` to
+    check and repair the database.
+    """
+
+
+def _open_repo_root(path: Path) -> tuple[object, Path]:
+    try:
+        repo = open_repo(path)
+    except NotAGitRepoError as exc:
+        click.echo(f"error: {exc}", err=True)
+        sys.exit(2)
+    repo_root = Path(repo.workdir).resolve() if repo.workdir else path.resolve()
+    return repo, repo_root
+
+
+@main.command()
 @click.argument(
     "path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
@@ -271,8 +312,7 @@ def _sync_mcp_port(repo_root: Path, *, port: int) -> bool:
     is_flag=True,
     help="Overwrite an existing slash-command file (used with --install-command).",
 )
-@click.version_option(__version__, prog_name="gitloco")
-def main(
+def serve(
     path: Path,
     host: str,
     port: int,
@@ -281,15 +321,9 @@ def main(
     install_mcp: bool,
     force: bool,
 ) -> None:
-    """Launch GitLoco for a local git repository."""
+    """Launch GitLoco for a local git repository (the default command)."""
     _set_process_title()
-    try:
-        repo = open_repo(path)
-    except NotAGitRepoError as exc:
-        click.echo(f"error: {exc}", err=True)
-        sys.exit(2)
-
-    repo_root = Path(repo.workdir).resolve() if repo.workdir else path.resolve()
+    _repo, repo_root = _open_repo_root(path)
 
     if install_command or install_mcp:
         try:
@@ -360,6 +394,40 @@ def main(
         port=chosen_port,
         log_config=_file_log_config(log_file),
     )
+
+
+@main.command()
+@click.argument(
+    "path",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    default=Path.cwd,
+)
+def doctor(path: Path) -> None:
+    """Check and repair GitLoco's database (.gitloco/comments.db).
+
+    Fixes everything it safely can — collapses duplicate commit versions,
+    re-links rebased threads, and runs a SQLite integrity check + vacuum.
+    Idempotent: a no-op on a healthy database.
+    """
+    _repo, repo_root = _open_repo_root(path)
+    settings = Settings.for_repo(repo_root)
+    db_path = settings.db_path
+    if not db_path.exists():
+        click.echo(f"No GitLoco database at {db_path} — nothing to repair.")
+        return
+
+    # Lazy heavy imports — see note at top of module.
+    from gitloco import doctor as doctor_mod
+    from gitloco.db import make_engine, session_scope
+
+    engine = make_engine(db_path)
+    with session_scope(engine) as session:
+        report = doctor_mod.repair(session, _repo)
+    report += doctor_mod.check_integrity(engine)
+
+    click.echo(f"GitLoco doctor · {db_path}")
+    for line in report:
+        click.echo(f"  • {line}")
 
 
 if __name__ == "__main__":
