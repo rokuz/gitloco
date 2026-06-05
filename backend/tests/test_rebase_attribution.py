@@ -109,3 +109,20 @@ def test_resolve_works_after_rebase(
     assert [t["id"] for t in client.get(f"/api/threads?sha={new_sha}").json()] == [tid]
     r = client.post(f"/api/threads/{tid}/resolve")
     assert r.status_code == 200 and r.json()["status"] == "resolved"
+
+
+def test_rebased_thread_is_not_reported_orphaned(
+    client: TestClient, latest_sha: str, repo_dir: Path
+):
+    """Regression: right after a rebase the thread must not flicker into the
+    orphan list. The orphans endpoint reconciles by identity, so the thread
+    snaps to its new commit even though nothing queried the new hash yet."""
+    tid = _new_thread(client, latest_sha).json()["id"]
+    _old, new_sha = _amend(repo_dir, "def greet(name: str) -> None:\n    pass\n")
+
+    # Without ever loading the new commit's threads/versions:
+    orphans = client.get("/api/threads/orphans").json()
+    assert [t["id"] for t in orphans] == []
+
+    # And the reconciliation actually linked the new hash to the thread.
+    assert [t["id"] for t in client.get(f"/api/threads?sha={new_sha}").json()] == [tid]

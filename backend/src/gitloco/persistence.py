@@ -435,13 +435,9 @@ def reachable_shas(repo: pygit2.Repository) -> set[str]:
     return {str(c.id) for c in walker}
 
 
-def orphaned_threads(
-    session: Session, repo: pygit2.Repository
+def _current_orphans(
+    session: Session, reachable: set[str]
 ) -> list[Thread]:
-    """Threads whose persistent commit has no version reachable from HEAD (the
-    whole logical commit was rebased away without being re-linked), so they
-    appear under no current commit."""
-    reachable = reachable_shas(repo)
     # pc_id -> set of its version hashes
     hashes_by_pc: dict[int, set[str]] = {}
     for v in session.exec(select(CommitVersion)).all():
@@ -454,6 +450,68 @@ def orphaned_threads(
         if not (hashes & reachable):
             out.append(t)
     return out
+
+
+def _link_reachable_by_identity(
+    session: Session,
+    repo: pygit2.Repository,
+    reachable: set[str],
+    pc_ids: set[int],
+) -> bool:
+    """Link any commit reachable from HEAD whose identity matches one of the
+    given (orphan-candidate) persistent commits but isn't linked yet.
+
+    Linking a rebased commit is otherwise lazy — it happens only when the new
+    hash is queried — so a freshly rebased thread looks orphaned until the UI
+    happens to load its commit. Doing it here removes that flicker. Returns
+    True if anything was linked."""
+    want: dict[tuple, int] = {}
+    for v in session.exec(
+        select(CommitVersion).where(CommitVersion.persistent_commit_id.in_(pc_ids))
+    ).all():
+        if v.subject is not None and v.author_time is not None:
+            want.setdefault(
+                (v.subject, v.author_email, v.author_time), v.persistent_commit_id
+            )
+    if not want:
+        return False
+    known = {v.commit_hash for v in session.exec(select(CommitVersion)).all()}
+    targets = set(want.values())
+    linked: set[int] = set()
+    for h in reachable:
+        if h in known:
+            continue
+        ident = commit_identity(repo, h)
+        if ident is None:
+            continue
+        pc_id = want.get(
+            (ident["subject"], ident["author_email"], ident["author_time"])
+        )
+        if pc_id is not None and pc_id not in linked:
+            resolve_pc(session, repo, h, create=False)  # race-safe identity link
+            linked.add(pc_id)
+            if linked == targets:
+                break
+    return bool(linked)
+
+
+def orphaned_threads(
+    session: Session, repo: pygit2.Repository
+) -> list[Thread]:
+    """Threads whose persistent commit has no version reachable from HEAD (the
+    whole logical commit was rebased away without being re-linked), so they
+    appear under no current commit.
+
+    Before reporting, reconcile any rebased commit reachable from HEAD whose
+    identity matches a candidate, so a just-rewritten thread snaps straight to
+    its new commit instead of briefly showing as orphaned."""
+    reachable = reachable_shas(repo)
+    candidates = _current_orphans(session, reachable)
+    if candidates:
+        pc_ids = {t.persistent_commit_id for t in candidates}
+        if _link_reachable_by_identity(session, repo, reachable, pc_ids):
+            candidates = _current_orphans(session, reachable)
+    return candidates
 
 
 def latest_version(session: Session, pc_id: int) -> CommitVersion | None:
