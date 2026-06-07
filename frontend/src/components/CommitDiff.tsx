@@ -6,6 +6,8 @@ import type {
   FileDiff as FileDiffData,
   LineSide,
 } from "../api/types";
+import { detachedThreads } from "../utils/detachedThreads";
+import { DetachedThreads } from "./DetachedThreads";
 import { FileDiff } from "./FileDiff";
 import { ThreadMinimap } from "./ThreadMinimap";
 import { VersionPicker } from "./VersionPicker";
@@ -128,6 +130,9 @@ export function CommitDiff({ sha }: Props) {
         ? a.line_number - b.line_number
         : a.file_path.localeCompare(b.file_path),
     );
+  // Open threads on a file that isn't in this diff (e.g. it was deleted) can't
+  // render inline — surface them at the end so they stay resolvable.
+  const detached = detachedThreads(files, openThreads);
 
   return (
     <div className="flex gap-4">
@@ -172,6 +177,7 @@ export function CommitDiff({ sha }: Props) {
             );
           })
         )}
+        <DetachedThreads threads={detached} />
       </div>
       <ThreadMinimap threads={openThreads} />
 
