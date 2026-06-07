@@ -99,7 +99,7 @@ function App() {
               <h2 className="font-mono text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 break-all">
                 {selectedSha}
               </h2>
-              <CommitDiff sha={selectedSha} />
+              <CommitDiff key={selectedSha} sha={selectedSha} />
             </div>
           ) : (
             <p className="text-zinc-500 text-sm">

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type {
@@ -58,6 +58,10 @@ export function CommitDiff({ sha }: Props) {
     queryKey: ["compare", sha, fromName, toName],
     queryFn: () => api.commitCompare(sha, fromName, toName),
     enabled: hasVersions,
+    // Keep the previous comparison visible while a new one loads (e.g. when
+    // switching versions) so the diff never collapses mid-view. CommitDiff is
+    // keyed by sha in App, so this never bleeds across commits.
+    placeholderData: keepPreviousData,
   });
 
   const liveDiffQuery = useQuery({
@@ -91,21 +95,30 @@ export function CommitDiff({ sha }: Props) {
     setShowLatestPrompt(false);
   };
 
+  // Prefer the compare result; fall back to the (cached) live diff while
+  // compare loads. This matters right after the first comment flips a commit
+  // from "no versions" to "has versions": without the fallback the view would
+  // collapse to a loader, resetting the scroll position to the top.
+  const compareFiles: FileDiffData[] | null =
+    hasVersions && compareQuery.data
+      ? compareQuery.data.files
+          .filter((c) => c.status !== "unchanged")
+          .map(compareFileToDiff)
+      : null;
+  const liveFiles: FileDiffData[] | null = liveDiffQuery.data?.files ?? null;
+  const files: FileDiffData[] = compareFiles ?? liveFiles ?? [];
+  const hasContent = compareFiles !== null || liveFiles !== null;
+
+  // Only show the full-page loader on the very first load (nothing to show).
   const isLoading =
-    versionsQuery.isLoading ||
-    (hasVersions ? compareQuery.isLoading : liveDiffQuery.isLoading);
+    !hasContent &&
+    (versionsQuery.isLoading || compareQuery.isLoading || liveDiffQuery.isLoading);
   const error =
     versionsQuery.error ??
     (hasVersions ? compareQuery.error : liveDiffQuery.error);
 
   if (isLoading) return <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">Loading diff…</div>;
-  if (error) return <div className="p-4 text-sm text-red-600 dark:text-red-400">Error: {String(error)}</div>;
-
-  const files: FileDiffData[] = hasVersions
-    ? (compareQuery.data?.files ?? [])
-        .filter((c) => c.status !== "unchanged")
-        .map(compareFileToDiff)
-    : (liveDiffQuery.data?.files ?? []);
+  if (error && !hasContent) return <div className="p-4 text-sm text-red-600 dark:text-red-400">Error: {String(error)}</div>;
 
   const threads = threadsQuery.data ?? [];
   const openThreads = threads
