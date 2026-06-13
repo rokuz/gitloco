@@ -67,6 +67,7 @@ def create_app(settings: Settings) -> FastAPI:
             "status": "ok",
             "version": __version__,
             "repo": _display_path(settings.repo_path),
+            "repo_path": str(settings.repo_path),
         }
 
     # Serve the built frontend (if it was bundled into the package). Mounted

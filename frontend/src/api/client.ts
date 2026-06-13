@@ -32,7 +32,10 @@ async function sendJson<T>(
 }
 
 export const api = {
-  health: () => getJson<{ status: string; version: string; repo: string }>("/api/health"),
+  health: () =>
+    getJson<{ status: string; version: string; repo: string; repo_path: string }>(
+      "/api/health",
+    ),
   commits: () => getJson<CommitList>("/api/commits"),
   diff: (sha: string) => getJson<CommitDiff>(`/api/commits/${encodeURIComponent(sha)}/diff`),
   threads: (params: { sha?: string; path?: string; status?: ThreadStatus | "all" } = {}) => {

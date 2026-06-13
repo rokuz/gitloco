@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
+  Decoration,
   Diff,
   Hunk,
   getChangeKey,
@@ -30,6 +32,7 @@ const refractorAdapter = {
   },
 };
 import type { FileDiff as FileDiffData, LineSide, Thread } from "../api/types";
+import { api } from "../api/client";
 import { detectLanguage } from "../utils/language";
 import { NewThreadComposer } from "./NewThreadComposer";
 import { ThreadView } from "./ThreadView";
@@ -95,10 +98,19 @@ export function FileDiff({
   onCloseComposer,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  const { data: health } = useQuery({ queryKey: ["health"], queryFn: api.health });
   const displayPath =
     file.new_path && file.new_path !== "/dev/null"
       ? file.new_path
       : file.old_path ?? "(unknown)";
+
+  // Deep link to open the file in VSCode on the machine running the backend.
+  // Only meaningful for files that still exist on disk (not deleted) and when
+  // we know the repo's absolute path. Format: vscode://file/<absolute path>.
+  const vscodeUrl =
+    health?.repo_path && file.status !== "deleted" && file.new_path
+      ? `vscode://file${encodeURI(`${health.repo_path}/${file.new_path}`)}`
+      : null;
 
   const language = detectLanguage(file.new_path ?? file.old_path);
   const filePath = file.new_path ?? file.old_path ?? "";
@@ -140,6 +152,7 @@ export function FileDiff({
         displayPath={displayPath}
         collapsed={collapsed}
         threadCount={threads.length}
+        vscodeUrl={vscodeUrl}
         onToggle={() => setCollapsed((v) => !v)}
       />
       {!collapsed && body}
@@ -245,7 +258,14 @@ function ParsedFileBody({
           },
         }}
       >
-        {(hunks) => hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)}
+        {(hunks) =>
+          hunks.flatMap((hunk) => [
+            <Decoration key={`deco-${hunk.content}`}>
+              <span className="diff-hunk-header-content">{hunk.content}</span>
+            </Decoration>,
+            <Hunk key={hunk.content} hunk={hunk} />,
+          ])
+        }
       </Diff>
       {orphanedInFile.length > 0 && (
         <div className="px-3 py-2 space-y-2 border-t border-zinc-200 dark:border-zinc-800">
@@ -268,12 +288,14 @@ function FileHeader({
   displayPath,
   collapsed,
   threadCount,
+  vscodeUrl,
   onToggle,
 }: {
   file: FileDiffData;
   displayPath: string;
   collapsed: boolean;
   threadCount: number;
+  vscodeUrl: string | null;
   onToggle: () => void;
 }) {
   const renamed =
@@ -305,7 +327,26 @@ function FileHeader({
           </span>
         )}
       </button>
+      {vscodeUrl && (
+        <a
+          href={vscodeUrl}
+          title="Open in VSCode"
+          aria-label="Open in VSCode"
+          className="shrink-0 px-3 py-2 text-zinc-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        >
+          <VscodeIcon />
+        </a>
+      )}
     </header>
+  );
+}
+
+function VscodeIcon() {
+  // Visual Studio Code logo mark (Simple Icons).
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z" />
+    </svg>
   );
 }
 
